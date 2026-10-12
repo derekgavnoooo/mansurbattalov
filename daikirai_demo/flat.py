@@ -405,6 +405,10 @@ class Canvas:
                 w += f.getlength(ch) if f else px_ss * 0.5
         return w / SS
 
+    def finish_clean(self):
+        im = Image.fromarray((np.clip(self.img, 0, 1) * 255).astype(np.uint8))
+        return im.resize((W, H), Image.LANCZOS)
+
     def finish(self, tex, fx):
         """Пост-обработка в разрешении кадра. fx: dict(ca, glitch, shake, grain_i, flash, tint)."""
         im = Image.fromarray((np.clip(self.img, 0, 1) * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)
