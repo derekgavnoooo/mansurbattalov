@@ -275,35 +275,38 @@ def draw(cv, pose, root):
     cv.shape(neck(nk), C["skin"], W_OUT * sc * 0.9, key=3)
     cv.fill(neck(catmull([(-25, 100), (-26, 150), (0, 164), (26, 150), (25, 100)], closed=True)), C["skin_sh"], clip=[neck(nk)])
 
-    # тело: рубашка, галстук, пиджак
-    shirt = catmull([(-40, 180), (40, 180), (36, 300), (20, 720), (-20, 720), (-36, 300)], closed=True)
-    cv.shape(body(shirt), C["shirt"], W_OUT * sc, key=4)
-    cv.fill(body(catmull([(-40, 180), (40, 180), (30, 214), (0, 226), (-30, 214)], closed=True)), C["shirt_sh"], clip=[body(shirt)])
-    tie_sw = pose.get("tie", 0.0)
-    tie = catmull([(-9, 206), (-15 + tie_sw, 290), (-2 + tie_sw * 1.6, 330), (13 + tie_sw, 292), (9, 206)], closed=True)
-    cv.shape(body(tie), C["tie"], W_OUT * sc * 0.85, key=5)
-    cv.fill(body(catmull([(1, 210), (13 + tie_sw, 292), (-2 + tie_sw * 1.6, 330), (4 + tie_sw, 290)], closed=True)), C["tie_sh"], clip=[body(tie)])
-    knot = catmull([(-12, 190), (12, 190), (9, 210), (-9, 210)], closed=True)
-    cv.shape(body(knot), C["tie"], W_OUT * sc * 0.85, key=6)
-    for side in (-1, 1):
-        M = (lambda P: np.asarray(P, float)) if side < 0 else mir
-        coll = M(catmull([(-30, 178), (-36, 196), (-14, 220), (-4, 200)], closed=True))
-        cv.shape(body(coll), C["shirt"], W_OUT * sc * 0.8, key=7 + side)
-    blz = [(-30, 176), (-74, 192), (-128, 206), (-162, 236), (-176, 300), (-186, 720), (-8, 720), (-24, 330),
-           (-48, 262), (-40, 240), (-60, 226), (-36, 190)]
-    for side in (-1, 1):
-        M = (lambda P: np.asarray(P, float)) if side < 0 else mir
-        P = M(catmull(blz, closed=True))
-        cv.shape(body(P), C["blazer"], W_OUT * sc, key=10 + side)
-        cv.fill(body(M(catmull([(-176, 300), (-150, 280), (-120, 330), (-110, 720), (-186, 720)], closed=True))),
-                C["blazer_sh"], clip=[body(P)])
-        cv.stroke(body(M(catmull([(-36, 192), (-60, 226), (-40, 240), (-48, 262), (-24, 330), (-8, 720)]))),
-                  3.0 * sc, color=C["pipe"], key=12 + side)
-        cv.stroke(body(M(catmull([(-74, 194), (-126, 210), (-150, 226)]))), 2.6 * sc, color=C["pipe"], key=14 + side)
-        cv.stroke(body(M(catmull([(-60, 226), (-40, 240)]))), 2.0 * sc, key=16 + side)
-        for by in (370, 450, 530):
-            cv.shape(body(M(ellipse(-38, by, 6, 6, 0, 14))), C["gold"], 1.6 * sc, key=18 + side + by)
-        cv.stroke(body(M(catmull([(-110, 300), (-104, 340), (-108, 380)]))), 1.6 * sc, key=20 + side, taper=(0.4, 0.4))
+    if pose.get("body_fn"):
+        pose["body_fn"](cv, root, pose)
+    else:
+        # тело: рубашка, галстук, пиджак
+        shirt = catmull([(-40, 180), (40, 180), (36, 300), (20, 720), (-20, 720), (-36, 300)], closed=True)
+        cv.shape(body(shirt), C["shirt"], W_OUT * sc, key=4)
+        cv.fill(body(catmull([(-40, 180), (40, 180), (30, 214), (0, 226), (-30, 214)], closed=True)), C["shirt_sh"], clip=[body(shirt)])
+        tie_sw = pose.get("tie", 0.0)
+        tie = catmull([(-9, 206), (-15 + tie_sw, 290), (-2 + tie_sw * 1.6, 330), (13 + tie_sw, 292), (9, 206)], closed=True)
+        cv.shape(body(tie), C["tie"], W_OUT * sc * 0.85, key=5)
+        cv.fill(body(catmull([(1, 210), (13 + tie_sw, 292), (-2 + tie_sw * 1.6, 330), (4 + tie_sw, 290)], closed=True)), C["tie_sh"], clip=[body(tie)])
+        knot = catmull([(-12, 190), (12, 190), (9, 210), (-9, 210)], closed=True)
+        cv.shape(body(knot), C["tie"], W_OUT * sc * 0.85, key=6)
+        for side in (-1, 1):
+            M = (lambda P: np.asarray(P, float)) if side < 0 else mir
+            coll = M(catmull([(-30, 178), (-36, 196), (-14, 220), (-4, 200)], closed=True))
+            cv.shape(body(coll), C["shirt"], W_OUT * sc * 0.8, key=7 + side)
+        blz = [(-30, 176), (-74, 192), (-128, 206), (-162, 236), (-176, 300), (-186, 720), (-8, 720), (-24, 330),
+               (-48, 262), (-40, 240), (-60, 226), (-36, 190)]
+        for side in (-1, 1):
+            M = (lambda P: np.asarray(P, float)) if side < 0 else mir
+            P = M(catmull(blz, closed=True))
+            cv.shape(body(P), C["blazer"], W_OUT * sc, key=10 + side)
+            cv.fill(body(M(catmull([(-176, 300), (-150, 280), (-120, 330), (-110, 720), (-186, 720)], closed=True))),
+                    C["blazer_sh"], clip=[body(P)])
+            cv.stroke(body(M(catmull([(-36, 192), (-60, 226), (-40, 240), (-48, 262), (-24, 330), (-8, 720)]))),
+                      3.0 * sc, color=C["pipe"], key=12 + side)
+            cv.stroke(body(M(catmull([(-74, 194), (-126, 210), (-150, 226)]))), 2.6 * sc, color=C["pipe"], key=14 + side)
+            cv.stroke(body(M(catmull([(-60, 226), (-40, 240)]))), 2.0 * sc, key=16 + side)
+            for by in (370, 450, 530):
+                cv.shape(body(M(ellipse(-38, by, 6, 6, 0, 14))), C["gold"], 1.6 * sc, key=18 + side + by)
+            cv.stroke(body(M(catmull([(-110, 300), (-104, 340), (-108, 380)]))), 1.6 * sc, key=20 + side, taper=(0.4, 0.4))
 
     # уши
     for side in (-1, 1):
@@ -376,6 +379,8 @@ def draw(cv, pose, root):
     cv.shape(head(cl), C["clip2"], 2.4 * hs, key=133)
 
     # руки (перед телом)
+    if pose.get("arms_fn"):
+        pose["arms_fn"](cv, root, pose)
     for side, key in ((-1, "armL"), (1, "armR")):
         arm = pose.get(key)
         if arm is not None:

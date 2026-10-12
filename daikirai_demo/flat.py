@@ -158,6 +158,7 @@ class Canvas:
     def __init__(self, seed, boil=1.0, bg=(0, 0, 0)):
         self.img = np.ones((RH, RW, 3), np.float32) * np.asarray(bg, np.float32)
         self.seed = seed
+        self.rough = 0.0          # 0 — чистая линия, 1 — живая «от руки»
         r = np.random.default_rng(seed)
         self.waves = [(r.uniform(0, 2 * np.pi), 2 * np.pi / r.uniform(80, 280), r.uniform(0, 2 * np.pi),
                        r.uniform(0.2, 0.45) * boil) for _ in range(6)]
@@ -235,7 +236,7 @@ class Canvas:
                 nb = 1 if end == 0 else -2
                 t = P[end] - P[nb]
                 t /= np.linalg.norm(t) + 1e-9
-                n = int(r.uniform(0, overshoot) / 0.9)
+                n = int(r.uniform(0, overshoot * (1 + 1.5 * self.rough)) / 0.9)
                 if n:
                     add = P[end] + t * 0.9 * np.arange(1, n + 1)[:, None]
                     P = np.vstack([add[::-1], P]) if end == 0 else np.vstack([P, add])
@@ -250,7 +251,7 @@ class Canvas:
             press = np.minimum(1, s / max(ta, 1e-3)) ** 0.5 * np.minimum(1, (1 - s) / max(tb, 1e-3)) ** 0.5
             press = 0.25 + 0.75 * press
         k = np.convolve(r.standard_normal(n + 60), np.hanning(41) / np.hanning(41).sum(), "same")[30:30 + n]
-        press = press * (0.92 + 0.35 * k)
+        press = press * (0.92 + (0.35 + 0.35 * self.rough) * k)
         rad = np.clip(w * press * 0.5, 0.3, None) * SS
         Ps = P * SS
         box = self._bbox(Ps, rad.max() + 3)
@@ -264,6 +265,16 @@ class Canvas:
         a = (np.asarray(m.filter(ImageFilter.GaussianBlur(0.5)), np.float32) / 255 * alpha)[..., None]
         reg = self.img[y0:y1, x0:x1]
         reg[:] = reg * (1 - a) + np.asarray(color, np.float32) * a
+        if self.rough and not closed and L > 50 and w > 2 and r.random() < 0.18 * self.rough and alpha > 0.5:
+            # вторая, лёгкая проводка рядом — как у живого лайна
+            Q = np.asarray(pts, float)
+            Q, _ = resample(Q, 1.0)
+            a0, a1 = int(len(Q) * r.uniform(0, 0.3)), int(len(Q) * r.uniform(0.6, 1.0))
+            if a1 - a0 > 6:
+                rough, self.rough = self.rough, 0.0
+                self.stroke(Q[a0:a1] + r.normal(0, 1.0, 2), w * 0.45, color, alpha * 0.55, taper=(0.4, 0.4),
+                            key=key + 7777, overshoot=0)
+                self.rough = rough
 
     def union(self, polys, color, w=3.0, line=LINE, key=0):
         """Залитое объединение фигур с общим контуром (через расширение маски)."""
