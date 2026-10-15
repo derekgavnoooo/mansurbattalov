@@ -231,75 +231,60 @@ def build_head(eyes="open", mouth="smile"):
     decal("nose", [(-0.6, 0), (0.8, 0), (0.5, -2.5), (-0.4, -2.2)], M["mouth"], 0.0, -0.056, 0.0010, HEAD, scale=1.0)
 
 
-def hair_strand(name, az, p0, p1, w, ext=0.0, curl=0.0, r0=None, lift=0.006, tip_frac=0.0, n=9):
-    """Прядь по поверхности головы: азимут az (−90° — перёд), полярный угол от p0 до p1 (градусы)."""
+def lock(name, az, p0, p1, w, ext=0.0, curl=0.0, lift=0.008, tip_frac=0.0, n=12, blunt=0.6, thick=0.38):
+    """Крупный локон: широкий у корня, почти не сужается до 60% длины, острый только на кончике."""
     pts, rad = [], []
     for k in range(n):
         t = k / (n - 1)
         ph = math.radians(p0 + (p1 - p0) * t)
         a = math.radians(az + curl * t * t)
-        r = (r0 or HR) + lift + ext * t ** 2
-        x, y, z = r * math.sin(ph) * math.cos(a) * 0.95, r * math.sin(ph) * math.sin(a), r * math.cos(ph)
-        pts.append((x, y, z))
-        rad.append(w * (1 - t ** 1.7) + 0.0006)
-    V, F = tube(pts, rad, n=8, flatten=0.32)
-    nfaces = len(F)
-    seg = 8
-    fm = []
-    for i in range(nfaces):
-        if i < (n - 1) * seg:
-            fm.append(1 if (i // seg) >= (n - 1) * (1 - tip_frac) else 0)
-        else:
-            fm.append(1 if i == nfaces - 1 and tip_frac > 0 else 0)
-    return obj(name, V, F, mats=[M["hair"], M["tip"]], face_mat=fm, parent=HEAD, subsurf=1)
+        r = HR + lift + ext * t ** 2
+        pts.append((r * math.sin(ph) * math.cos(a) * 0.96, r * math.sin(ph) * math.sin(a), r * math.cos(ph)))
+        rad.append(w * (1 - max(0.0, (t - blunt) / (1 - blunt)) ** 1.25) + 0.0005)
+    V, F = tube(pts, rad, n=10, flatten=thick)
+    seg = 10
+    fm = [1 if (i < (n - 1) * seg and (i // seg) >= (n - 1) * (1 - tip_frac)) or (i >= (n - 1) * seg and tip_frac > 0 and i == len(F) - 1) else 0
+          for i in range(len(F))]
+    return obj(name, V, F, mats=[M["hair"], M["tip"]], face_mat=fm, parent=HEAD, subsurf=2)
 
 
 def build_hair():
-    # объём каре: шапка волос
+    # объём каре: шапка до линии челюсти, нижний край — несколько крупных зубцов
     V, F = [], []
-    nu, nv = 36, 16
+    nu, nv = 48, 18
     for j in range(nv + 1):
-        ph = math.radians(4 + 116 * j / nv)
         for i in range(nu):
             th = 2 * math.pi * i / nu
-            front = max(0.0, -math.sin(th))            # спереди шапка короче — открывает лицо
-            ph_eff = ph
-            r = HR * 1.07
-            x, y, z = r * math.sin(ph_eff) * math.cos(th) * 0.97, r * math.sin(ph_eff) * math.sin(th), r * math.cos(ph_eff)
+            tri = 1 - abs(((i / nu) * 7) % 1 * 2 - 1)            # 7 крупных зубцов по кругу
+            ph = math.radians(4 + (112 + 16 * tri * (j / nv) ** 3) * j / nv)
+            r = HR * (1.08 + 0.10 * (j / nv) ** 2)               # каре расширяется книзу
+            x, y, z = r * math.sin(ph) * math.cos(th) * 0.97, r * math.sin(ph) * math.sin(th), r * math.cos(ph)
             V.append((x, y + 0.004, z))
-    keep = []
+    fm = []
     for j in range(nv):
         for i in range(nu):
             th = 2 * math.pi * (i + 0.5) / nu
             ph = 4 + 116 * (j + 0.5) / nv
-            front = -math.sin(th)
-            if front > 0.45 and ph > 62:               # вырез под лицо
+            if -math.sin(th) > 0.42 and ph > 58:                 # вырез под лицо
                 continue
             a, b = j * nu + i, j * nu + (i + 1) % nu
             F.append((a, b, b + nu, a + nu))
-    obj("haircap", V, F, M["hair"], parent=HEAD, subsurf=1)
-    # чёлка
-    for k, (az, p1, w, curl) in enumerate([(-130, 80, 0.014, 6), (-118, 84, 0.015, 4), (-106, 88, 0.016, 3),
-                                           (-96, 92, 0.014, -2), (-90, 100, 0.012, 0), (-84, 92, 0.014, 2),
-                                           (-74, 88, 0.016, -3), (-62, 84, 0.015, -4), (-50, 80, 0.014, -6)]):
-        hair_strand(f"bang{k}", az, 8, p1, w, ext=0.008, curl=curl, lift=0.010)
-    # боковые и задние пряди каре с красными кончиками и разлётом
-    for k, az in enumerate(list(range(-160, 30, 13)) + list(range(30, 200, 15))):
-        if -55 > az > -125:
-            continue
-        flare = 0.022 if abs(math.sin(math.radians(az))) < 0.7 else 0.012
-        hair_strand(f"bob{k}", az, 10, 128, 0.022, ext=flare, curl=(7 if az % 2 else -7), lift=0.012, tip_frac=0.3)
-    # пряди, обрамляющие лицо
+            fm.append(1 if j >= nv - 3 else 0)                   # красные кончики снизу
+    obj("haircap", V, F, mats=[M["hair"], M["tip"]], face_mat=fm, parent=HEAD, subsurf=2)
+    # чёлка: 5 крупных локонов вместо девяти иголок
+    for k, (az, p1, w, curl) in enumerate([(-124, 84, 0.024, 8), (-106, 90, 0.026, 4), (-90, 98, 0.022, 0),
+                                           (-74, 90, 0.026, -4), (-56, 84, 0.024, -8)]):
+        lock(f"bang{k}", az, 6, p1, w, ext=0.006, curl=curl, lift=0.012)
+    # обрамляющие лицо пряди — по одной широкой с каждой стороны
     for s in (-1, 1):
-        hair_strand(f"lock{s}", -90 + s * 52, 30, 140, 0.016, ext=0.004, curl=-s * 4, lift=0.006, tip_frac=0.3)
+        lock(f"side{s}", -90 + s * 50, 34, 136, 0.022, ext=0.010, curl=-s * 6, lift=0.008, tip_frac=0.28, blunt=0.55)
     # ахоге
     pts = [(0.0, -0.02, HR + 0.006), (0.004, -0.01, HR + 0.03), (0.014, 0.0, HR + 0.05), (0.03, 0.004, HR + 0.055),
            (0.04, 0.0, HR + 0.045)]
-    v, f = tube(pts, [0.006, 0.005, 0.004, 0.0025, 0.0006], n=8, flatten=0.4)
-    obj("ahoge", v, f, M["hair"], parent=HEAD, subsurf=1)
-    # заколка-крестик
+    v, f = tube(pts, [0.007, 0.006, 0.005, 0.003, 0.0006], n=8, flatten=0.45)
+    obj("ahoge", v, f, M["hair"], parent=HEAD, subsurf=2)
     for k, a in enumerate((0.7, -0.7)):
-        c = Vector((-0.052, -0.088, 0.055))
+        c = Vector((-0.054, -0.094, 0.050))
         d = Vector((math.cos(a), 0, math.sin(a))) * 0.012
         v, f = tube([c - d, c + d], [0.0035, 0.0035], n=8)
         obj(f"clip{k}", v, f, M["clip"], parent=HEAD)
@@ -375,7 +360,7 @@ def setup_render(w=1280, h=720, samples=24):
     ls.select_by_edge_types = True
     ls.select_silhouette = True
     ls.select_border = True
-    ls.select_crease = True
+    ls.select_crease = False
     ls.select_external_contour = True
     ls.linestyle.color = hexc("#2b1d27")[:3]
     ls.linestyle.thickness = 2.2
