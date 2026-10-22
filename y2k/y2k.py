@@ -376,7 +376,7 @@ def setup_render(w=960, h=540, samples=10):
     SC.cycles.glossy_bounces = 3
     SC.cycles.diffuse_bounces = 1
     SC.cycles.transmission_bounces = 2
-    SC.render.use_persistent_data = True
+    SC.render.use_persistent_data = False   # с кэшем метаболы иногда рендерятся чёрными
     r.resolution_x, r.resolution_y = w, h
     SC.view_settings.view_transform = "AgX"
     SC.view_settings.look = "AgX - Punchy"
