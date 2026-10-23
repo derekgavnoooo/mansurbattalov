@@ -187,10 +187,13 @@ def background(t):
         rr = r.uniform(20, 70)
         d.ellipse((x - rr, y - rr, x + rr, y + rr), outline=(255, 255, 255, 170), width=3)
         d.arc((x - rr * 0.7, y - rr * 0.7, x + rr * 0.4, y + rr * 0.4), 200, 260, fill=(255, 255, 255, 220), width=4)
-    for k in range(9):                                    # лучи
+    rays = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(rays)
+    for k in range(9):                                    # лучи — отдельным полупрозрачным слоем
         a0 = math.radians(-60 + k * 15 + 4 * math.sin(t * 0.5 + k))
-        d.polygon([(OW / 2, -80), (OW / 2 + 2200 * math.sin(a0 - 0.03), 2200 * math.cos(a0 - 0.03)),
-                   (OW / 2 + 2200 * math.sin(a0 + 0.03), 2200 * math.cos(a0 + 0.03))], fill=(255, 255, 255, 9))
+        dr.polygon([(OW / 2, -80), (OW / 2 + 2200 * math.sin(a0 - 0.03), 2200 * math.cos(a0 - 0.03)),
+                    (OW / 2 + 2200 * math.sin(a0 + 0.03), 2200 * math.cos(a0 + 0.03))], fill=(255, 255, 255, 40))
+    im.alpha_composite(rays)
     return im
 
 
@@ -223,6 +226,11 @@ def render(fi):
     t = TL.T0 + fi / FPS
     p, mouth, closed = params(t)
     img, al = warp(face(mouth, closed), G["alpha"], p)
+    return render_from(t, img, al)
+
+
+def render_from(t, img, al):
+    """Кадр из готового (уже анимированного) персонажа: фон, камера, надписи, вспышки."""
     ch = Image.fromarray((np.dstack([np.clip(img, 0, 1), al]) * 255).astype(np.uint8), "RGBA")
     cx, cy, sc = camera(t)
     sc *= 1 + 0.03 * TL.pulse(t)
@@ -238,9 +246,6 @@ def render(fi):
     ox, oy = int(OW / 2 - cx * sc), int(OH / 2 - cy * sc)
     # белая обводка-«наклейка» вокруг силуэта
     a = chs.split()[3].filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(1))
-    halo = Image.new("RGBA", chs.size, (255, 255, 255, 255))
-    halo.putalpha(a)
-    out.alpha_composite(halo, (ox, oy)) if ox >= 0 and oy >= 0 else out.paste(halo, (ox, oy), halo)
     out.paste(chs, (ox, oy), chs)
     sparkles(out, t)
     # надписи в бит
