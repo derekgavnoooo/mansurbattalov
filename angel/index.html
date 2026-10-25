@@ -184,12 +184,6 @@ function embers(t,L,fr,n){
     const X=Math.round(x),Y=Math.round(y);if(X<0||X>=W||Y<0||Y>=H)continue;B[Y*W+X]+=(.35+.5*hash(fr,k))*L}
 }
 /* ---------- short scenes, 2.5–5 s each ---------- */
-const SH=[[0,'eye',{i:0,R:70,hook:1}],[3,'swarm',{seed:1}],[6.5,'ring',{cx:-30,cy:235,S:3.6,a:.32,b:.2}],[10.5,'wide',{cy:118,S:.6,sea:1,unf:1}],
- [14.5,'eye',{i:1,R:55}],[17.5,'ring',{cx:215,cy:300,S:2.7,a:.7,b:-.5}],[21,'fly',{s0:.8,k:.28}],[25,'eye',{i:2,R:62}],[27.5,'ring',{cx:190,cy:80,S:2.4,a:.9,b:.6}],
- [31,'swarm',{seed:2,stare:1}],[34,'wide',{cy:150,S:.85,unf:1}],[38,'feathers',{}],[42.5,'stars',{}],[47,'ring',{cx:90,cy:420,S:3.4,a:.1,b:1.4}],
- [51.5,'fly',{s0:.6,k:.42}],[55,'eye',{i:3,R:75}],[58,'swarm',{seed:3,stare:1}],[61,'wide',{cy:135,S:.75,unf:1}],[63.5,'core',{}],
- [68,'ringcore',{}],[71,'away',{}],[76,'feathers',{dark:1}],[80,'last',{}]];
-const CUTS=SH.slice(1).map(s=>s[0]);
 function burn(x,y,t,L,seed){const fl=fbm(x*.045+seed*9+t*.25,y*.05+t*1.3),f2=fbm(x*.11+seed,y*.12+t*2);return (.28+.45*fl+.15*f2)*L}
 function sEye(t,lt,p,L,E,fr){
   const i=p.i,ang=(hash(i,1)-.5)*1.6,R=p.R,ex=90+(hash(i,3)-.5)*24,ey=160+(hash(i,4)-.5)*50,ca=Math.cos(ang),sa=Math.sin(ang);
@@ -242,38 +236,128 @@ function sClouds(t,lt,L){
   const ax=90+30*Math.sin(t*.3),ay=-10+lt*14;const items=[];pushRings(items,t,ax,ay,.35,L*.9,E0,0,0,[0,1,2],.6,0);drawItems(items,t,E0);
 }
 let E0=0;
+/* ---------- the river Chebar ---------- */
+const HZ=252,GND=H-24;
+const TENTS=[[14,9,6,1],[33,7,5,0],[58,10,7,1],[121,8,6,0],[140,11,7,1],[163,8,5,1]];
+function stormSky(x,y,t,L,st,fr,dawn){
+  let v=(.1+.07*fbm(x*.02+t*.01,y*.03)+.2*Math.pow(y/HZ,2))*L;
+  if(dawn)v=(.22+.25*Math.pow(y/HZ,1.5)+.06*fbm(x*.02,y*.04))*L;
+  v+=.22*L*Math.exp(-(HZ-y)/35);
+  if(st>0){const m=sm(.0,1,st)*sm(230,40,Math.hypot(x-150,(y-80)*1.3)),c=fbm(x*.02+t*.03,y*.035-t*.02),dn=sm(.42,.7,c)*m;
+    const fire=sm(.55,.85,fbm(x*.04-t*.1,y*.05+t*.2))*m*(.6+.4*Math.sin(t*7+x*.1));
+    v=v*(1-dn)+(.06+.1*c)*L*dn+fire*.55*L*st;
+    if(hash(fr,77)<.13*st){v+=.35*dn;const bx=120+50*hash(fr,78)+10*(fbm(y*.08,fr)-.5)*2;if(Math.abs(x-bx)<.9&&y>20+40*hash(fr,79))v=1}}
+  return v;
+}
+function riverScene(t,fr,L,st,dawn,angel){
+  for(let y=0;y<HZ;y++)for(let x=0;x<W;x++){let v=stormSky(x,y,t,L,st,fr,dawn);
+    if(y>HZ-14){for(const [tx,tw,th,fire] of TENTS){const d=Math.abs(x-tx)/tw;if(d<1&&y>HZ-th*Math.pow(1-d,.7)*(1+.15*(fbm(x*.3,tx)-.5))-1)v=.025*L+(dawn?.05:0)}
+      if(y>=HZ-2)v=.03*L+(dawn?.06:0);
+      for(const [tx,tw,th,fire] of TENTS)if(fire&&!dawn){const d=Math.hypot(x-tx-tw-2,y-HZ+2);v+=(.7+.3*hash(fr,tx))*Math.exp(-d*d/1.5)*L}}
+    B[y*W+x]=v}
+  if(angel)angel();
+  for(let y=HZ;y<H;y++)for(let x=0;x<W;x++){const k=(y-HZ)/(H-HZ),sy=Math.max(0,Math.min(HZ-1,Math.round(2*HZ-y-3+3*Math.sin(x*.15+t*2+y*.4)*k))),sx=Math.max(0,Math.min(W-1,Math.round(x+2*Math.sin(y*.5+t*1.5)*k)));
+    let v=B[sy*W+sx]*(.7-.3*k)+.02*L+.04*L*sm(.7,.9,fbm(x*.05,y*.4-t*.3));
+    if(y<HZ+4)v=.03*L+(dawn?.05:0);
+    if(y>GND+5*(fbm(x*.04,3)-.5)*2)v=(.04+.03*fbm(x*.1,y*.1))*L+(dawn?.05:0);
+    B[y*W+x]=v}
+  for(let k=0;k<12;k++){const left=k<6,xk=left?hash(k,1)*34:146+hash(k,1)*34,h=25+75*hash(k,2)**1.5,sw=3*Math.sin(t*1.1+k)*(1+st);
+    for(let y=Math.max(0,(H-h)|0);y<H;y++){const q=(H-y)/h,xx=Math.round(xk+sw*q*q);if(xx>=0&&xx<W)B[y*W+xx]=.015;if(q>.85&&q<1&&xx+1<W)B[y*W+xx+1]=.02}}
+}
+function prophet(fx,fy,h,pose,t,lit,L){
+  const x0=Math.max(0,(fx-h)|0),x1=Math.min(W-1,(fx+h)|0),y0=Math.max(0,(fy-h*1.15)|0),y1=Math.min(H-1,(fy+2)|0);
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    const u=(x-fx)/h,w=(fy-y)/h,n=.035*(fbm(x*.4,y*.4)-.5);let inF=false;
+    if(pose==='stand'||pose==='eat'){inF=(w>=0&&w<.83&&Math.abs(u)<.16+.1*(1-w)+n)||Math.hypot(u,(w-.9)*1.1)<.1+n||(Math.abs(u-.28-.02*w)<.028&&w>0&&w<1.05);
+      if(pose==='eat')inF=inF||Math.hypot(u-.12,w-.78)<.08}
+    else if(pose==='lie')inF=((u/.62)**2+((w-.09)/.11)**2<1+n*4)||Math.hypot(u-.58,w-.12)<.1;
+    else if(pose==='kneel')inF=(w>=0&&w<.55&&Math.abs(u)<.24-.08*w+n)||Math.hypot(u+.04,(w-.63)*1.1)<.1;
+    else inF=(w>=0&&w<.42&&Math.abs(u)<.27-.1*w+n)||Math.hypot(u,(w-.52)*1.1)<.1;
+    if(inF){let c=.02;if(lit&&u>0&&!((pose==='stand'||pose==='eat')&&Math.abs(u)<.1))c+=.12*lit*L;B[y*W+x]=c}}
+  if(pose==='eat'){const X=Math.round(fx+.12*h),Y=Math.round(fy-.8*h);for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)if(X+i>=0&&X+i<W&&Y+j>=0)B[(Y+j)*W+X+i]=.85*L}
+}
+function angelOver(t,cx,cy,S,unf,L,E,F,fr,aw,look){
+  if(unf>0)for(let y=0;y<HZ;y++)for(let x=0;x<W;x++){const w=wings(x,y,t,cx,cy,S,unf,L,E),i=y*W+x;if(w>B[i])B[i]=w;B[i]+=core(x,y,cx,cy,S,L,E)}
+  const items=[];pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],aw,look);drawItems(items,t,E);
+}
+function vortex(t,fr,L,E,st){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const dx=x-90,dy=y-120,r=Math.hypot(dx,dy*1.2),a=Math.atan2(dy,dx);
+    let v=(.05+.38*sm(.4,.78,fbm(a*2.2+r*.022+t*.35,r*.025-t*.3)))*L*st;
+    v+=.95*Math.exp(-r/(24+12*E))*(.6+.4*fbm(t*3,a*2))*L*st+.25*Math.exp(-r/70)*L*st;
+    if(hash(fr,77)<.2){const bx=60+60*hash(fr,78)+12*(fbm(y*.07,fr)-.5)*2;if(Math.abs(x-bx)<.9&&y<120+80*hash(fr,80))v=1;v+=.08}
+    B[y*W+x]=v}
+  embers(t,L*st,fr,60);
+}
+function firmament(t,L){
+  for(let y=0;y<170;y++)for(let x=0;x<W;x++){const r=Math.hypot(x-90,(y-58)*1.15),i=y*W+x;
+    const a=Math.atan2(y-58,x-90),rr=r*(1+.18*(fbm(a*2+3,t*.1)-.5)*2);
+    let v=.12*sm(150,0,y)*L+(hash(x,y)>.992?.4*(.5+.5*Math.sin(t*4+x)):0)*L;
+    v+=.18*Math.exp(-(((rr-44)/7)**2))*L*(.7+.3*fbm(a*5,t*.3))+.1*Math.exp(-(((rr-66)/9)**2))*L+.95*Math.exp(-r/11)*L+.22*Math.exp(-r/45)*L;
+    B[i]=Math.max(B[i],v)}
+}
+function glyphs(x,y,left,top,L,glow){
+  const ry=Math.floor((y-top)/7),yy=(y-top)%7,cx=Math.floor((x-left)/5),xx=(x-left)%5;if(ry<0||cx<0)return 0;
+  if(cx>3+Math.floor(hash(ry,9)*9)+((ry*3)%4))return 0;
+  if(yy>=1&&yy<=5&&xx>=1&&xx<=3&&hash(cx*7+ry*131,(yy-1)*3+(xx-1))>.48)return glow*L;return 0;
+}
+function scrollAt(t,cx,top,w,hgt,L,fr){
+  const left=cx-w/2;
+  for(let y=Math.max(0,(top-6)|0);y<Math.min(H,top+hgt+6);y++)for(let x=Math.max(0,(left-3)|0);x<Math.min(W,left+w+3);x++){
+    const e=4*(fbm(y*.15,x>cx?1:2)-.5);if(x<left+e||x>left+w-e)continue;let v;
+    if(y<top||y>top+hgt){v=(.5+.25*Math.cos((y<top?y-top+3:y-top-hgt-3)*.5))*L}
+    else{v=(.28+.12*fbm(x*.15,y*.15))*L;v+=glyphs(x,y,left+4,top+4,L,.75);v-=.15*sm(w*.42,w*.5,Math.abs(x-cx))*L}
+    B[y*W+x]=v}
+}
+/* ---------- the story, 2.5–5 s per shot ---------- */
+const SH=[[0,'eye',{i:0,R:70,hook:1}],[3,'swarm',{seed:1}],[6.5,'river',{st:.35}],[10.5,'vortex',{}],[14,'river',{st:1}],
+ [17.5,'ring',{cx:150,cy:-40,S:3,a:1.25,b:.3}],[21,'riverAngel',{cy:95,S:.42}],[25,'eye',{i:2,R:62}],[27.5,'below',{}],[31,'swarm',{seed:2,stare:1}],
+ [34,'riverAngel',{cy:100,S:.5}],[38,'lie',{}],[43,'stars',{}],[47.5,'rise',{}],[51.5,'scroll',{}],[55.5,'scrollClose',{}],
+ [58.5,'fly',{s0:.6,k:.42}],[61.5,'eat',{}],[65.5,'core',{}],[69.5,'ascend',{}],[74,'vortexOut',{}],[78,'dawn',{}]];
+const CUTS=SH.slice(1).map(s=>s[0]);
 function sceneRun(t,fr,E,F){
-  const L=1-.85*sm(74,84,t);E0=E;
+  const L=1-.35*sm(80,85,t);
   let i=0;while(i<SH.length-1&&t>=SH[i+1][0])i++;
   const [t0,type,p]=SH[i],lt=t-t0;
   if(type==='eye')sEye(t,lt,p,L,E,fr);
   else if(type==='swarm')sSwarm(t,lt,p,L,E,fr);
-  else if(type==='ring')sRing(t,lt,p,L,E,F,fr);
-  else if(type==='wide')sAngel(t,90,p.cy,p.S,p.unf,L,E,F,fr,1,0,p.sea?232:undefined,{heaven:1,ruins:1,birds:1});
-  else if(type==='wing'){for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L*.7,90,160,1);const w=wings(x,y,t+lt*.4,p.cx+lt*12,p.cy-lt*8,p.S,1,L,E);if(w>v)v=w;B[y*W+x]=v}}
-  else if(type==='fly')sAngel(t,90,150,p.s0*Math.exp(p.k*lt),1,L,E,F,fr,1,sm(1.5,2.2,lt),undefined,{birds:lt<1.6});
-  else if(type==='feathers')sFeathers(t,lt,p,L,E,F,fr);
-  else if(type==='clouds')sClouds(t,lt,L);
+  else if(type==='ring'){vortex(t,fr,L*.6,E,1);const items=[];pushRings(items,t,p.cx,p.cy+lt*14,p.S,L,E,F,fr,[0],sm(.3,2.5,lt),0,{0:{a:p.a,b:p.b,sp:.12,ne:30}},.5);drawItems(items,t,E)}
+  else if(type==='river'){riverScene(t,fr,L,p.st*(1+.3*lt/4),0);prophet(60,GND+2,46,'stand',t,p.st,L)}
+  else if(type==='vortex')vortex(t,fr,L,E,sm(0,1,lt));
+  else if(type==='riverAngel'){riverScene(t,fr,L,.6,0,()=>angelOver(t,90,p.cy,p.S,1,L,E,F,fr,1,sm(1,2,lt)));birds(t,90,p.cy,p.S,fr);prophet(52,GND+2,42,'stand',t,1,L)}
+  else if(type==='below'){
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=stormSky(x,y*.6,t,L,.8,fr,0)+.35*L*Math.exp(-(H-y)/70);
+    angelOver2(t,90,110,1.15,L,E,F,fr,sm(.5,1.5,lt));prophet(90,H+4,70,'stand',t,1,L)}
+  else if(type==='lie'){riverScene(t,fr,L,.15,0);firmament(t,L);prophet(80,GND+3,48,'lie',t,1,L)}
   else if(type==='stars'){
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=(.03+.04*fbm(x*.02,y*.02)+.12*sm(.45,.8,fbm(x*.015+y*.012,y*.02-x*.005)))*L;
       const g=hash(x>>1,y>>1);if(g>.985&&(x&1)===0&&(y&1)===0)v+=(.4+.4*Math.sin(t*3+g*99))*L;B[y*W+x]=v}
     for(let k=0;k<24;k++){const ex=10+160*hash(k,41),ey=15+290*hash(k,42),r=3+5*hash(k,43),o=sm(.8+hash(k,44)*3,1.2+hash(k,44)*3,lt);
       if(o>0)bigEye(ex,ey,r,o*(hash(fr>>1,k)<.06?.1:1),.25*Math.sin(t+k),0,k*5,t,.5)}}
-  else if(type==='core'||type==='ringcore'){
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,L,90,158,3)+core(x,y,90,158,2.2,L,E)*.6;
-    const items=[];pushRings(items,t*(type==='ringcore'?2.2:1),90,158,type==='ringcore'?1.3:2.15,L,E,F,fr,[0,1,2],1,1,null,.6);drawItems(items,t,E);
-    bigEye(90,158,(type==='ringcore'?44:62)+5*E,type==='core'?sm(.2,1.6,lt):1,0,0,99,t,1)}
-  else if(type==='away'){const S=1.5*Math.exp(-.45*lt),top=H+10-(H-150)*sm(0,5,lt);
-    sAngel(t,90,150-25*sm(0,5,lt),S,1-.4*sm(2,5,lt),L,E,F,fr,1-sm(1,4.5,lt),0,top,{heaven:1,ruins:1,birds:1})}
-  else{/* last eye closes in the dark */
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,.18,90,160,1);
-    bigEye(90,160,58,1-sm(1.5,4.6,lt),0,0,99,t,.3)}
+  else if(type==='rise'){riverScene(t,fr,L,.1,0);firmament(t,L);
+    prophet(80,GND+3,48,lt<1.3?'lie':lt<2.6?'kneel':'stand',t,1,L)}
+  else if(type==='scroll'){riverScene(t,fr,L,.1,0);firmament(t,L);const top=-80+sm(0,2.5,lt)*170,hg=10+sm(1.2,3.8,lt)*95;scrollAt(t,90,top,46,hg,L,fr);prophet(90,GND+3,46,'stand',t,1,L)}
+  else if(type==='scrollClose'){for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=goldLeaf(x,y,L*.35);scrollAt(t,90,22-lt*18,150,330,L,fr);embers(t,L,fr,80)}
+  else if(type==='fly')sAngel(t,90,150,p.s0*Math.exp(p.k*lt),1,L,E,F,fr,1,sm(1.5,2.2,lt));
+  else if(type==='eat'){riverScene(t,fr,L,.1,0);firmament(t,L);prophet(90,GND+3,62,lt<.8?'stand':'eat',t,1,L);
+    if(lt>.8)for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]+=.6*Math.exp(-Math.hypot(x-97,y-(GND-47))/(5+9*sm(.8,3.5,lt)))*L}
+  else if(type==='core'){
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=goldLeaf(x,y,L*.4)+core(x,y,90,158,2.2,L,E)*.6;
+    const items=[];pushRings(items,t,90,158,2.15,L,E,F,fr,[0,1,2],1,1,null,.6);drawItems(items,t,E);bigEye(90,158,62+5*E,sm(.2,1.6,lt),0,0,99,t,1)}
+  else if(type==='ascend'){riverScene(t,fr,L,.5+.1*lt,0,()=>angelOver(t,90,110-lt*32,.5-.05*lt,1,L,E,F,fr,1,0));prophet(66,GND+2,42,'stand',t,1,L)}
+  else if(type==='vortexOut')vortex(t,fr,L*(1-.6*sm(0,4,lt)),E*.5,1-sm(1,4,lt));
+  else{riverScene(t,fr,L*.95,0,1);prophet(76,GND+3,46,'sit',t,0,L)}
 }
-const CAPS=[[.3,2.9,'their rings were|full of eyes',11],[3.2,6.2,'so high that|they were dreadful',11],[64,68,'BE NOT AFRAID',14]];
+function angelOver2(t,cx,cy,S,L,E,F,fr,look){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const w=wings(x,y,t,cx,cy,S,1,L,E),i=y*W+x;if(w>B[i])B[i]=w;B[i]+=core(x,y,cx,cy,S,L,E)}
+  const items=[];pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],1,look);drawItems(items,t,E);
+}
+const CAPS=[[.3,2.9,'their rings were|full of eyes',11],[3.2,6.2,'so high that|they were dreadful',11],[7,10.3,'by the river|of chebar',11],
+ [10.8,13.8,'a whirlwind came|out of the north',11],[39,42.8,'son of man,|stand upon thy feet',11],[52,55.3,'written within|and without',11],
+ [62,65.3,'it was in my mouth|as honey',11],[66,69.3,'BE NOT AFRAID',14],[78.6,84.8,'and i sat there|astonished|seven days',11]];
 function text(t,fr){
   mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';
   for(const [a,z,s,sz] of CAPS)if(t>=a&&t<z&&hash(fr,5)>.1){mc.font=`bold ${sz}px "Courier New",monospace`;
-    s.split('|').forEach((l,k)=>{const ox=(hash(fr,9+k)-.5)*1.4,oy=(hash(fr,19+k)-.5)*1.4,y=H*.8+k*15;
+    s.split('|').forEach((l,k)=>{const ox=(hash(fr,9+k)-.5)*1.4,oy=(hash(fr,19+k)-.5)*1.4,y=H*.17+k*15;
       mc.fillStyle='rgb(255,0,0)';mc.fillText(l,W/2+1+ox,y+1+oy);mc.fillStyle='rgb(0,255,0)';mc.fillText(l,W/2+ox,y+oy)})}
   return mc.getImageData(0,0,W,H).data;
 }
