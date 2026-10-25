@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Be Not Afraid</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* vertical 9:16: ophanim in golden haze; 180×320 px, 5 warm tones, 4×4 ordered dither */
+:root{
+  --umber:#0a0604; --bronze:#342012; --gold:#80582e; --halo:#d6aa60; --ivory:#fcf0d6;
+  --mono:"Courier New",Courier,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--umber);color:var(--ivory);overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#gate{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%;border:0;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--umber);color:var(--ivory);font:13px/1.6 var(--mono);text-align:center;cursor:pointer}
+#gate[hidden]{display:none}
+#gate:focus-visible{outline:1px dashed var(--halo);outline-offset:-12px}
+#gate .t{font-size:clamp(20px,6vw,34px);letter-spacing:.3em;color:var(--halo);text-transform:uppercase}
+#gate .w{max-width:36ch;opacity:.55}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="A biblically accurate angel: burning wheels covered in eyes"></canvas>
+<button id="gate" type="button">
+  <span class="t">be not afraid</span>
+  <span id="gl">[ watch ]</span>
+  <span class="w">Silent here. The video version has music.</span>
+</button>
+<script>
+(()=>{
+const EN_E="139<?@BB@?>??ABB?=;>BDDCCA@?>=>?><<?AA?==@CGGKLNOSXXVQONNMMNOMLKLLKIIJKKLLKKKMMLLKKKLKJHHIJKKLLKJJKKKJJJKMNNNNNMLLKLKJKLLJIIJLNNNPRRPMLLLLLMMMMMMLPTVSPOOOMLMMLKJJJJJJJIIIHHIIKMOOPONNNONLKKMLLJJKKKKLLMNNMMMNORTTSQOONONOOONLKJKMLLLLLMMMLMNPPQRTXXXUTRPONMLLMNKKKLLLKKKLMNMKIHIKKKJKJKKKJJJJKKKKKKJIHHGHKLMMLLNOMKJJJJIHJJKKIJLLLJKKMLKIHHJKKKKJKJJMRVTQNLKKKLNMJIJKKLKKJJKLLLLMMNOONMMKKJKKJKKKKKKKJKJKKKKLMLMKJIIJKLLNOONMNOOMMKLKLKLKLLKKLNPONMLLLNMLKJJGHEFEEEDCBDEEDDDDDEECDDEEFFGEDDDCA@@ABCDDDDEECA@@@@@@@BCC@>>>>@???????>=>>??@@@ABB@@@ABDCDCFGHGGFEEDDCCCBB@A@A@AAABACCCBBBBBBCBCBB@?=>>@@AAACEGFEECB@@ABB@?<<;;;;<===>======>@BDDBA>=>?@ABBCDIIJHIIHGFFGHIIIGHGHFEEEFHIHHHGGGGGFEFFFEDCDDEFGGGGHHHGHIGFECCDEEFHHGHIHGFGGECBAA@ABCDDCCBCEFFDDFFIJJIIJKKJJJKKKHHGGGGGFFFHIJIIHGHHIJIHFFEFEEDFFGFFHIIGEDDCCDDDEEECCCBBBCCCCBCBBBDEGHHJIIHFECCCGILKLKKLMLJKIHFGHGECBBBBAAA@A@@>>>?AAA@??>>>>=====<<<<<<;:9:;<<<<;;;;;;::99999887887877787777766666666555555555555554444444443333333344443333322222222222222222222211111111111111111111110000000000000000",EN_F="16HGO==000015;;6001=@?;8804775@@=14BA?224DDJ:E;DRRP992<<<33544446475:<<9886888AAA99<663246><<8861;;:444;;C996::;5;6722?=?4469>:74:=;5999004>>:>>>@CC300:::00122101115;;;66<;;599406::35554:::33==>36596:>>=::8777006660:::8880288=7C<<4==9::A7:3:99=;;133><<79:63A>>4663667111056>:84443220003@@@;;911100<>@4538==9888@@C474=::@@@CCCAAAAAD7757871888LLX<<088868810;<<488577<887662EEE;;;000777>>>AAA===3337CCB660223;;:1<<;0:@@6035654543;;;=>>A@@>>D>>700066=6604440457354655400112398<69385567966=::DDD022545778CCA000==?3353588604786564:88023:8B;C=ME@666111000::=374?;?;;;4;7811012354<9900079:3:99AAA0111015647660003349:8688411;;?==8@@@0244<;@9IRWE700<<<13324441776334479638894=;B9988800177;<<8<<<0004441119DD<44877411455100087>@@9<<<036;9<@EBIEA055:55555044400444001766122255455;7;4514596455>99011211444@@@22204;>938890369767784477815:B>=58495833778555888333:::99<==9888BBB@@@7772229997771332223666111555111112443111444335776666111889776222111333133211000011100022211111211111100011122111100022211100000000000000000000000000000000000000";
+const W=180,H=320,DUR=85.4,FPS=12,TAU=Math.PI*2,CX=90,CY=150;
+const PAL=[[10,6,4],[52,32,18],[128,88,46],[214,170,96],[252,240,214]];
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
+function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0;
+  h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296}
+function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
+function fbm(x,y){return vn(x,y)*.5+vn(x*2.03+5.2,y*2.03+1.3)*.25+vn(x*4.01+9.1,y*4.01+3.7)*.125}
+const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
+const mus=(s,t)=>{const i=Math.min(s.length-1,Math.max(0,Math.round(t*FPS)));return (s.charCodeAt(i)-48)/40};
+const Es=t=>{let a=0;for(let k=-6;k<=6;k++)a+=mus(EN_E,t+k/FPS);return a/13};
+const life=t=>sm(0,4,t)*(1-.8*sm(74,84,t));
+
+/* organic eye, local units; open 0..1, (lx,ly) gaze */
+function eye(v,dx,dy,open,lx,ly,seed,t,glow){
+  const ax=Math.abs(dx);if(ax>1.45||Math.abs(dy)>1.2)return v;
+  const sh=ax<1?Math.pow(1-dx*dx,.8):0,nt=fbm(dx*2.2+seed,t*.25),nb=fbm(dx*2.2+seed+9,t*.2);
+  const top=-(.58*open*sh)*(.78+.44*nt),bot=(.42*open*sh)*(.78+.44*nb);
+  const dT=dy-top,dB=bot-dy,ins=Math.min(dT,dB);
+  if(ins<=0){if(ax<1.3){const o=-ins,fold=dy<0?Math.abs(o-.17-.06*nt):Math.abs(o-.13-.05*nb);
+    v-=Math.exp(-fold*fold/.002)*(1-ax*.6)*.25;if(ax<1)v-=Math.exp(-o*o/.002)*.3}return v}
+  const ix=dx-lx,iy=dy-ly,ir=Math.hypot(ix,iy),an=Math.atan2(iy,ix);
+  const Rir=.44*(1+.12*(fbm(an*1.3+seed,t*.05)-.5)),Rp=.15*(.92+.2*(fbm(an*1.7+seed,t*.3)-.5));
+  const vv=fbm(dx*3+seed,dy*3),vein=Math.max(0,1-Math.abs(vv-.5)*9)*ax;
+  let e=.92-vein*.3-ax*ax*.3;
+  const q=fbm(an*5+fbm(ir*9+seed,an*2)*1.8+seed,ir*12),ib=sm(Rir*1.08,Rir*.9,ir);
+  e=e*(1-ib)+(.3+.35*q+glow*.25)*(.55+.45*sm(Rir,Rir*.7,ir))*ib;
+  const pb=sm(Rp*1.15,Rp*.88,ir);e=e*(1-pb)+.02*pb;
+  if((ix+.13)**2+(iy+.15)**2<.006+.004*fbm(seed,t))e=1;
+  e*=.45+.55*sm(0,.2,dT);e*=.6+.4*sm(0,.12,dB);
+  const k=sm(0,.05,ins);return v*(1-k)+e*k;
+}
+
+/* rings: radius, tilt, yaw, spin, eye count */
+const RINGS=[[1,.35,0,.22,14,4],[.82,1.25,.9,-.3,11,7],[.64,.75,-.8,.4,9,10]];
+function ringPose(k,t){const [R,a0,b0,sp,ne,tin]=RINGS[k],ss=1+.5*Es(t);
+  return {R,a:a0+.5*Math.sin(t*.09+k*2)+t*.05*(k-1),b:b0+t*.07*(k%2?-1:1)*ss,phi:t*sp*ss,ne,vis:sm(tin,tin+3,t)}}
+function proj(R,s,p,wob){const r=R*(1+wob),x0=r*Math.cos(s),y0=r*Math.sin(s);
+  const ca=Math.cos(p.a),sa=Math.sin(p.a),cb=Math.cos(p.b),sb=Math.sin(p.b);
+  const y1=y0*ca,z1=y0*sa,x2=x0*cb+z1*sb,z2=-x0*sb+z1*cb,f=4/(4+z2);
+  return [CX+x2*70*f,CY+y1*70*f,z2,f]}
+
+/* wings: base angle (from up, clockwise), length */
+const WINGS=[[-.55,1],[.55,1],[-1.45,.9],[1.45,.9],[-2.45,.8],[2.45,.8]];
+function background(x,y,t,L){
+  const dx=x-CX,dy=y-CY,r=Math.hypot(dx,dy),th=Math.atan2(dx,-dy);
+  const w1=fbm(x*.02+t*.012,y*.02),cl=fbm(x*.016+w1*1.6-t*.01,y*.03+w1);
+  let v=(.06+.13*cl+.34*Math.exp(-r/60))*L;
+  v+=.14*L*sm(.55,.85,fbm(th*6+20,t*.04))*Math.exp(-r/210)*sm(18,40,r);
+  const unf=sm(14,21,t)*(1-.25*sm(74,84,t)),E=Es(t);
+  if(unf>0){let wv=0;
+    WINGS.forEach(([b,len],k)=>{
+      const sg=b<0?-1:1,fl=Math.sin(t*.55+k*1.7)*(.06+.06*E);
+      const Lw=136*len*unf*(.9+.2*hash(k,5)),rr=r/Lw;if(rr>1.05||rr<.1)return;
+      const base=b*(.35+.65*unf)+fl+sg*.32*rr*rr;
+      let d=th-base;d=Math.atan2(Math.sin(d),Math.cos(d));
+      const half=(.12+.3*Math.pow(rr,.55)*(1-.55*rr*rr))*(1+.12*(fbm(rr*4,k)-.5));
+      const q=d*sg/Math.max(.02,half);
+      const lead=-q;if(lead>1.02-.22*(fbm(rr*5+k,k*2)-.3)-.08*Math.abs(Math.sin(rr*11+k)))return;
+      let c;
+      if(q>0&&rr>.42){
+        const fq=q*6+.6*(fbm(rr*3,k*3)-.5),fi=Math.floor(fq),fu=fq-fi;if(fi>6)return;
+        const tipr=.82+.2*hash(fi,k+40)-.04*fi*(fi>3?1:0);if(rr>tipr)return;
+        if(q>1.25+.15*fi/6)return;
+        const gap=sm(.0,.14,fu)*sm(1,.86,fu);
+        c=.62+.28*Math.exp(-r/90)-.2*rr-.3*(1-gap)-.18*sm(tipr-.08,tipr,rr);
+        c+=.06*Math.sin(fu*Math.PI)-.06*fbm(x*.25,y*.25);
+      }else{
+        if(q>1)return;if(rr>.98-.06*Math.max(0,q))return;
+        const sc=((rr*15+Math.abs(q)*1.6+fbm(rr*4,q+k)*.8)%1);
+        c=.66+.3*Math.exp(-r/90)-.18*rr-.1*sm(-.2,-1,q)-(rr<.45?.18*sm(.65,.95,sc):0)-.25*sm(.82,1.02,lead);
+        if(rr>=.42)c-=.12*sm(.2,.0,q)*0;
+      }
+      wv=Math.max(wv,c*L)});
+    if(wv>0)v=Math.max(v,wv);
+  }
+  v+=1.1*Math.exp(-r/9)*L*(.7+.3*E)+.25*Math.exp(-r/28)*L;
+  return v;
+}
+
+const out=document.getElementById('c');out.width=W;out.height=H;
+const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data,B=new Float32Array(W*H);
+const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
+const CAPS=[[63.5,70.5,'BE NOT AFRAID']];
+function text(t,fr){
+  mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';mc.font='bold 14px "Courier New",monospace';
+  for(const [a,z,s] of CAPS)if(t>=a&&t<z&&hash(fr,5)>.1){const ox=(hash(fr,9)-.5)*1.4,oy=(hash(fr,19)-.5)*1.4;
+    mc.fillStyle='rgb(255,0,0)';mc.fillText(s,W/2+1+ox,H*.8+1+oy);mc.fillStyle='rgb(0,255,0)';mc.fillText(s,W/2+ox,H*.8+oy)}
+  return mc.getImageData(0,0,W,H).data;
+}
+function awake(t){return sm(15,34,t)*(1-.45*sm(37,40,t))+.45*sm(51,58,t)}
+function renderFrame(t){
+  const fr=Math.round(t*FPS),md=text(t,fr),L=life(t),E=Es(t),F=mus(EN_F,t);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=background(x,y,t,L*(.85+.25*E));
+  /* drifting feathers and dust */
+  for(let k=0;k<110;k++){const sp=6+10*hash(k,2),yy=((hash(k,1)*360+t*sp)%360)-20,xx=hash(k,3)*W+8*Math.sin(t*.7+k);
+    const i=(yy|0)*W+(xx|0);if(yy>=0&&yy<H&&xx>=0&&xx<W)B[i]+=(.25+.3*hash(k,4))*L*sm(36,44,t+k*.05)*.9+.08*L}
+  /* rings and eyes, back to front */
+  const items=[],look=sm(58,61,t)*(1-sm(73,77,t)),aw=awake(t);
+  RINGS.forEach((_,k)=>{const p=ringPose(k,t);if(p.vis<=0)return;
+    for(let i=0;i<600;i++){const s=i/600*TAU,wob=.06*(fbm(s*2.2+k*3,t*.2)-.5)*2,thk=.7+.6*fbm(s*3+k,t*.3);
+      for(const rr of [1.03,.97,.91]){const fl=fbm(s*9+k+rr*7,t*2.2),[sx,sy,z,f]=proj(p.R*(rr+.03*(fl-.5)),s,p,wob);
+        items.push([z,0,sx,sy,1.7*f*thk,(.42+.58*fl-(rr<.95?.1:0))*p.vis*L*(.8+.35*E)])}
+      if(hash(i+k*999,(t*6)|0)<.02){const [sx,sy,z,f]=proj(p.R*(1.08+.1*hash(i,(t*6)|0)),s,p,wob);items.push([z,0,sx,sy,1.1*f,.9*p.vis*L])}}
+    for(let j=0;j<p.ne;j++){const s=j/p.ne*TAU+p.phi,[sx,sy,z,f]=proj(p.R*.96,s,p,0),idx=k*20+j;
+      const th=hash(idx,3)*.85;let o=sm(th,th+.12,aw)*p.vis;
+      if(hash(fr>>1,idx)<.04+.25*F*(F>.55?1:0))o*=.08;
+      o*=1-sm(70+hash(idx,8)*8,72+hash(idx,8)*8,t);
+      items.push([z-.01,1,sx,sy,(8.5+4.5*hash(idx,4))*f,o,idx,(.75+.25*(1-z))*L])}});
+  items.sort((a,b)=>b[0]-a[0]);
+  for(const it of items){
+    if(it[1]===0){const [,,sx,sy,r,c]=it,R=Math.ceil(r+1);
+      for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const X=Math.round(sx)+i,Y=Math.round(sy)+j;if(X<0||X>=W||Y<0||Y>=H)continue;
+        const a=Math.exp(-(i*i+j*j)/(r*r));B[Y*W+X]=B[Y*W+X]*(1-a)+c*a}}
+    else{const [,,sx,sy,r,o,idx,br]=it,R=Math.ceil(r*1.5);
+      const gx=look?(CX-sx)/120*.3*(1-look)+0:.3*Math.sin(t*.4+idx),gy=look?0:.15*Math.cos(t*.33+idx*1.7);
+      for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const X=Math.round(sx)+i,Y=Math.round(sy)+j;if(X<0||X>=W||Y<0||Y>=H)continue;
+        const b0=B[Y*W+X];B[Y*W+X]=eye(b0,i/r,j/r,o,gx*(1-look),gy*(1-look),idx*1.37,t,E)*br+b0*(1-br)}}}
+  /* the central eye */
+  const co=sm(61.5,64.5,t)*(1-sm(77,81,t));
+  if(co>0){const r=30+4*E,R=Math.ceil(r*1.5);
+    for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const X=CX+i,Y=CY+j;if(X<0||X>=W||Y<0||Y>=H)continue;
+      B[Y*W+X]=eye(B[Y*W+X],i/r,j/r,co,0,0,99,t,1)}}
+  for(let y=0;y<H;y++){const by=(y&3)*4;for(let x=0;x<W;x++){
+    const i=y*W+x,o=i*4;let v=Math.pow(Math.max(0,B[i]),.9);
+    v+=(hash(i,fr*7+1)-.5)*.12;const du=hash(i,fr*13);if(du<.0005)v=1;
+    const nx=(x-90)/90,ny=(y-160)/160;v*=1-.28*(nx*nx+ny*ny)*.5;
+    let l=Math.floor(v*4+BAY[by+(x&3)]);l=l<0?0:l>4?4:l;
+    if(md[o+1]>127)l=4;else if(md[o]>127)l=1;
+    const c=PAL[l];px[o]=c[0];px[o+1]=c[1];px[o+2]=c[2];px[o+3]=255}}
+  oc.putImageData(img,0,0);
+}
+window.renderFrame=renderFrame;window.DUR=DUR;window.FPS=FPS;
+const gate=document.getElementById('gate');let st=0,lastFr=-1,run=false;
+function loop(now){if(!run)return;requestAnimationFrame(loop);const t=(now-st)/1000;
+  if(t>DUR){run=false;document.getElementById('gl').textContent='[ watch again ]';gate.hidden=false;return}
+  const fr=Math.floor(t*FPS);if(fr!==lastFr){lastFr=fr;renderFrame(fr/FPS)}}
+gate.addEventListener('click',()=>{st=performance.now();lastFr=-1;gate.hidden=true;run=true;requestAnimationFrame(loop)});
+renderFrame(30);gate.focus();
+})();
+</script>
+</body>
+</html>
