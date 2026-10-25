@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Плоть видит</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* один экран: ксерокопия плоти, 1-битный дизер в четырёх тонах засохшей крови */
+:root{
+  --void:#040202; --scab:#340506; --meat:#841012; --bone:#e2d6be;
+  --mono:"Courier New",Courier,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--void);color:var(--bone);overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;image-rendering:crisp-edges;display:block;cursor:crosshair}
+#gate{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--void);font:13px/1.6 var(--mono);text-align:center;cursor:pointer;border:0;color:var(--bone);width:100%}
+#gate[hidden]{display:none}
+#gate:focus-visible{outline:1px dashed var(--meat);outline-offset:-12px}
+#gate .t{font-size:clamp(20px,6vw,34px);letter-spacing:.4em;color:var(--meat);text-transform:uppercase;animation:tw 2.3s steps(1) infinite}
+#gate .w{max-width:36ch;opacity:.6}
+@keyframes tw{0%,91%,96%{transform:none;opacity:1}93%{transform:translate(3px,-1px) skewX(14deg);opacity:.4}}
+@media (prefers-reduced-motion:reduce){#gate .t{animation:none}}
+</style>
+<canvas id="c" aria-label="Анимация: дышащая плоть, на которой открываются глаза"></canvas>
+<button id="gate" type="button">
+  <span class="t">не&nbsp;смотри</span>
+  <span>[ нажми, чтобы смотреть ]</span>
+  <span class="w">Резкие вспышки, мерцание и громкий звук. Не включай, если светочувствителен.</span>
+</button>
+<script>
+(()=>{
+const W=192,H=144,N=W*H,LOOP=52,FPS=12;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d',{alpha:false});
+cv.width=W;cv.height=H;ctx.imageSmoothingEnabled=false;
+const buf=document.createElement('canvas');buf.width=W;buf.height=H;
+const b=buf.getContext('2d');const img=b.createImageData(W,H);const px=img.data;
+const val=new Float32Array(N);
+const PAL=[[4,2,2],[52,5,6],[132,16,18],[226,214,190]];
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
+
+function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0;
+  h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296}
+function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi),c1=hash(xi+1,yi),c2=hash(xi,yi+1),c3=hash(xi+1,yi+1);
+  return a+(c1-a)*u+(c2-a)*v+(a-c1-c2+c3)*u*v}
+function fbm(x,y){return vn(x,y)*.5+vn(x*2.03+5.2,y*2.03+1.3)*.25+vn(x*4.01+9.1,y*4.01+3.7)*.125}
+const sm=(a,b2,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b2-a)));return t*t*(3-2*t)};
+const R=Math.random;
+
+/* --- ввод --- */
+let mx=W/2,my=H/2,lastMove=-1e9;
+addEventListener('pointermove',e=>{
+  const s=Math.max(innerWidth/W,innerHeight/H);
+  mx=(e.clientX-(innerWidth-W*s)/2)/s;my=(e.clientY-(innerHeight-H*s)/2)/s;lastMove=performance.now();
+});
+
+/* --- звук --- */
+let ac=null,master,lp,noiseBuf;
+function startAudio(){
+  try{
+    ac=new (window.AudioContext||window.webkitAudioContext)();
+    master=ac.createGain();master.gain.value=.5;master.connect(ac.destination);
+    lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=140;lp.Q.value=9;lp.connect(master);
+    [41,41.6,61.7,82.9,123.1].forEach((f,i)=>{const o=ac.createOscillator();o.type=i%2?'sawtooth':'square';
+      o.frequency.value=f;const g=ac.createGain();g.gain.value=.07;o.connect(g).connect(lp);o.start()});
+    noiseBuf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);
+    const nd=noiseBuf.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=R()*2-1;
+  }catch(e){ac=null}
+}
+function thump(v){if(!ac)return;const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+  o.frequency.setValueAtTime(72,t);o.frequency.exponentialRampToValueAtTime(28,t+.16);
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+.28);
+  o.connect(g).connect(master);o.start(t);o.stop(t+.3)}
+function hiss(d,v,f){if(!ac)return;const s=ac.createBufferSource();s.buffer=noiseBuf;s.playbackRate.value=.5+R();
+  const bp=ac.createBiquadFilter();bp.type='bandpass';bp.frequency.value=f||1200+R()*3000;bp.Q.value=1.5;
+  const g=ac.createGain();g.gain.value=v;s.connect(bp).connect(g).connect(master);s.start();s.stop(ac.currentTime+d)}
+function screech(){if(!ac)return;const t=ac.currentTime;
+  [1760,1873,2490].forEach(f=>{const o=ac.createOscillator(),g=ac.createGain(),l=ac.createOscillator(),lg=ac.createGain();
+    o.type='sawtooth';o.frequency.value=f;l.frequency.value=31;lg.gain.value=f*.08;l.connect(lg).connect(o.frequency);
+    g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.5);
+    o.connect(g).connect(master);o.start(t);l.start(t);o.stop(t+.55);l.stop(t+.55)})}
+function setGain(v,tc){if(ac)master.gain.setTargetAtTime(v,ac.currentTime,tc||.05)}
+
+/* --- глаза --- */
+let eyes=[];
+function spawnEye(){
+  for(let k=0;k<40;k++){
+    const r=6+R()*11,x=r+R()*(W-2*r),y=r*.7+R()*(H-1.4*r);
+    if(y>H*.56&&Math.abs(x-W/2)<56)continue;
+    if(eyes.some(e=>Math.hypot(e.x-x,(e.y-y)*1.6)<(e.r+r)*1.15))continue;
+    eyes.push({x,y,r,born:T,open:0,px:0,py:0,pupil:.15,blink:0,seed:R()*99,tilt:(R()-.5)*.5});return}
+}
+function drawEye(e,fr){
+  const r=e.r,o=e.open,ct=Math.cos(e.tilt),st=Math.sin(e.tilt);
+  const x0=Math.max(0,(e.x-r*1.35)|0),x1=Math.min(W-1,(e.x+r*1.35)|0);
+  const y0=Math.max(0,(e.y-r*.95)|0),y1=Math.min(H-1,(e.y+r*.95)|0);
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    const ux=(x-e.x)/r,uy=(y-e.y)/r,dx=ux*ct+uy*st,dy=-ux*st+uy*ct;
+    const adx=Math.abs(dx),ady=Math.abs(dy),i=y*W+x;
+    const half=adx<1?o*.55*Math.pow(1-dx*dx,.8):0;
+    if(ady<half){
+      const ix=dx-e.px,iy=dy-e.py,ir=Math.sqrt(ix*ix+iy*iy);let v;
+      if(ir<e.pupil)v=0;
+      else if(ir<.43){v=ir>.39?.06:.22+.3*vn(Math.atan2(iy,ix)*5+e.seed,ir*12)}
+      else{const n=fbm(x*.35+e.seed,y*.35+fr*.01);
+        v=.97-Math.max(0,1-Math.abs(n-.5)*13)*.75-Math.max(0,adx-.65)*1.1}
+      v-=Math.max(0,1-(half-ady)/(half*.4+.01))*(dy<0?.45:.2);
+      const sx=ix+.14,sy=iy+.14;if(sx*sx+sy*sy<.007)v=1;
+      val[i]=v;
+    }else{
+      const ring=Math.sqrt(dx*dx+dy*dy*3.2);
+      if(ring<1.3){const k=1-ring/1.3,wr=Math.sin(dy*38+dx*4+e.seed)*.5+.5;
+        let v=val[i]*(1-k*.55)+k*.38*wr;
+        if(adx<1&&ady-half<.07)v-=.5;
+        val[i]=v}
+    }
+  }
+}
+
+/* --- рот --- */
+function drawMouth(m,fr){
+  const cx=W/2,cy=H*.76,hw=46,hh=17*m;
+  for(let y=Math.max(0,(cy-hh-12)|0);y<Math.min(H,cy+hh+4);y++)for(let x=(cx-hw)|0;x<cx+hw;x++){
+    const dx=(x-cx)/hw,sh=Math.pow(Math.max(0,1-dx*dx),.65),curve=-dx*dx*9*m;
+    const yt=cy+curve-hh*sh,yb=cy+curve+hh*sh*.85;
+    if(y<yt-1.5||y>yb+1.5)continue;
+    const i=y*W+x;
+    if(y<yt||y>yb){val[i]=.04;continue}
+    const kk=(dx+1)*8.5,k=Math.floor(kk),u=kk-k,taper=Math.sqrt(Math.max(0,1-Math.abs(u-.5)*2.3));
+    const Lt=hh*1.15*(.35+.55*hash(k,7))*taper,Lb=hh*.95*(.3+.5*hash(k,13))*taper;
+    const dt=y-yt,db=yb-y;let v=.02+.06*hash(i,fr);
+    if(dt<Lt)v=.95-dt/Math.max(1,Lt)*.4-(hash(k,3)>.75?.25:0);
+    else if(db<Lb)v=.85-db/Math.max(1,Lb)*.4;
+    else if(dt<2.5||db<2.5)v=.5;
+    val[i]=v;
+  }
+}
+
+/* --- текст --- */
+const MSG=[[9,12.5,'ты здесь?'],[15,18,'не моргай'],[23.5,27,'оно растёт под кожей'],
+  [30.5,34,'мы слышим твой пульс'],[38.5,43.6,'Я ВИЖУ ТЕБЯ'],[47,51.5,'теперь ты тоже']];
+function say(s,y,j){
+  b.font='bold 10px "Courier New",monospace';b.textAlign='center';b.textBaseline='middle';
+  const ox=(R()-.5)*j,oy=(R()-.5)*j;
+  b.fillStyle='rgb(52,5,6)';b.fillText(s,W/2+2+ox,y+1+oy);
+  b.fillStyle='rgb(226,214,190)';b.fillText(s,W/2+ox,y+oy);
+}
+
+/* --- время --- */
+let T=0,frame=0,ph=0,hbPrev=0,beatOn=true,lastRender=0,t0=0,lastNow=0,sublimFired=false,screamed=false,loopN=0;
+function heartbeat(dt,tension,stare){
+  const bpm=stare?156:48+tension*96;ph+=dt*bpm/60;
+  const p=ph%1;
+  if(beatOn&&ac){if(p<hbPrev)thump(.8);else if(hbPrev<.17&&p>=.17)thump(.45)}
+  hbPrev=p;
+  return Math.exp(-p*14)+.6*(p>.17?Math.exp(-(p-.17)*14):0);
+}
+
+function render(hb,tension,stare){
+  frame++;
+  const fade=sm(0,6,T),cx=W/2,cy=H/2,bulge=1-hb*.06;
+  const black=T>=44,sublim=T>=45.15&&T<45.35;
+  if(!black||sublim){
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const X=cx+(x-cx)*bulge,Y=cy+(y-cy)*bulge,s=.04;
+      const wx=fbm(X*s+T*.07,Y*s)*3.2,wy=fbm(X*s+11.3,Y*s-T*.06)*3.2;
+      const f=fbm(X*s*1.4+wx,Y*s*1.4+wy);
+      const n=fbm(X*.09+wy*.6,Y*.09-wx*.6+T*.02);
+      const vein=Math.max(0,1-Math.abs(n-.5)*28);
+      const dvx=(x-cx)/W,dvy=(y-cy)/H,vig=1-(dvx*dvx+dvy*dvy)*2.6;
+      val[y*W+x]=((f*1.3-.2)*vig-vein*.5+hb*.13*vig)*(sublim?1:fade);
+    }
+  }else val.fill(0);
+
+  if(sublim){
+    drawEye({x:W/2,y:H/2,r:W*.47,open:1,px:0,py:0,pupil:.33,seed:3,tilt:0},frame);
+  }else if(!black){
+    const target=T<6?0:Math.min(13,1+Math.floor((T-6)/1.05));
+    while(eyes.length<target)spawnEye();
+    const active=performance.now()-lastMove<1500;
+    for(const e of eyes){
+      const age=T-e.born;let o=Math.min(1,age/2.5)*(age<3?1+Math.sin(age*31)*.12:1);
+      if(stare)o=1.1;
+      else if(e.blink<=0&&R()<.012)e.blink=1;
+      if(e.blink>0){o*=Math.abs(e.blink-.5)*2;e.blink-=.34}
+      e.open=o;
+      let tx=0,ty=0;
+      if(active&&!stare){const ddx=mx-e.x,ddy=my-e.y,l=Math.hypot(ddx,ddy)||1,m=Math.min(.34,l/50);tx=ddx/l*m;ty=ddy/l*m*.8}
+      else if(!stare){tx=Math.sin(T*.7+e.seed)*.08;ty=0}
+      if(!stare&&R()<.06){tx+=(R()-.5)*.3;ty+=(R()-.5)*.2}
+      e.px+=(tx-e.px)*(stare?.9:.4);e.py+=(ty-e.py)*(stare?.9:.4);
+      e.pupil=stare?.29:.12+tension*.09+hb*.05;
+      drawEye(e,frame);
+    }
+    if(T>20)drawMouth(sm(20,31,T)*(.82+.18*Math.sin(T*2.7))*(stare?1.15:1),frame);
+  }else if(T>=46.5){
+    drawEye({x:W/2,y:H*.45,r:12,open:sm(47,51,T),px:0,py:0,pupil:.3,seed:7,tilt:0},frame);
+  }
+
+  /* зерно, царапины, пыль, дизер */
+  const inv=!black&&R()<.004+tension*.02;
+  const scr=R()<.35?(R()*W|0):-1,scr2=R()<.15?(R()*W|0):-1;
+  for(let y=0;y<H;y++){const by=(y&3)*4;for(let x=0;x<W;x++){
+    const i=y*W+x;let v=val[i]+(hash(i,frame*7)-.5)*.16;
+    if(x===scr||x===scr2)v+=.45*hash(y>>2,frame);
+    const dust=hash(i,frame*13);if(dust<.0005)v=1;else if(dust>.9993)v=0;
+    if(inv)v=1-v;
+    let l=Math.floor(v*3+BAY[by+(x&3)]);l=l<0?0:l>3?3:l;
+    const c=PAL[l],o=i*4;px[o]=c[0];px[o+1]=c[1];px[o+2]=c[2];px[o+3]=255;
+  }}
+  b.putImageData(img,0,0);
+
+  for(const [a,z,s] of MSG)if(T>=a&&T<z&&hash(frame,5)>.18)
+    say(s,s===s.toUpperCase()?H*.5:H*.2+(hash(a|0,1)-.5)*10,stare?3:1.4);
+
+  /* разрыв строк при выводе */
+  ctx.drawImage(buf,0,0);
+  const g=black?0:.03+tension*.16;
+  if(R()<g){hiss(.12+R()*.2,.25+tension*.3);
+    for(let k=0,n=1+R()*4|0;k<n;k++){const y=R()*H|0,h=2+R()*18|0,sh=(R()-.5)*40|0;
+      ctx.drawImage(buf,0,y,W,h,sh,y,W,h)}}
+  if(R()<g*.4){const y=R()*H|0;ctx.drawImage(buf,0,y,W,1,0,y,W,6+R()*20|0)}
+}
+
+function tick(now){
+  requestAnimationFrame(tick);
+  const dt=Math.min(.1,(now-lastNow)/1000);lastNow=now;
+  T=((now-t0)/1000)%LOOP;
+  const n=Math.floor((now-t0)/1000/LOOP);
+  if(n!==loopN){loopN=n;eyes=[];sublimFired=false;screamed=false;setGain(.5,.5);beatOn=true}
+  const tension=Math.min(1,T/40),stare=T>=38&&T<44;
+  if(lp&&ac)lp.frequency.setTargetAtTime(120+tension*700+(stare?900:0),ac.currentTime,.4);
+  if(T>=44&&beatOn){beatOn=false;setGain(0,.01)}
+  if(T>=45.15&&!sublimFired){sublimFired=true;setGain(.9,.005);hiss(.25,1,900);screech()}
+  if(T>=45.5&&!screamed){screamed=true;setGain(0,.03)}
+  if(T>=46.5&&!beatOn&&ac&&master.gain.value<.05)setGain(.18,1.5);
+  const hb=beatOn?heartbeat(dt,tension,stare):0;
+  if(now-lastRender>=1000/(stare?24:FPS)){lastRender=now;render(hb,tension,stare)}
+}
+
+const gate=document.getElementById('gate');
+gate.addEventListener('click',()=>{
+  startAudio();gate.hidden=true;t0=lastNow=performance.now();requestAnimationFrame(tick);
+});
+gate.focus();
+})();
+</script>
+</html>
