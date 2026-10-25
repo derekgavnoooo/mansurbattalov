@@ -106,7 +106,7 @@ fin = np.zeros((N, 2))
 for t in (40.4, 41.7): s_ = int(t * SR); x_ = env(hz, .001, .1)[:N - s_]; fin[s_:s_ + len(x_)] += x_ * .5
 # глаз открылся: протяжный стон кита
 moan = filt(add(resample(stretch(choirH, 1.5), .3), resample(stretch(scream, 1.6), .28), .5), hi=600)
-put(under, env(moan, .8, 1.5), 27.4, .8, wet=.8)
+put(under, env(moan, .8, 1.5), 27.4, .45, wet=.9)
 put(under, env(moan[::-1], .8, 1.5), 31.5, .9, wet=.8)
 # светящиеся точки: тонкий хор сверху
 put(under, env(filt(resample(choirA[::-1], 1.4), lo=900, hi=5000), 1.5, 2), 30.6, .18, wet=.9)

@@ -98,7 +98,7 @@ function above(x,y,t){
 
 /* ---------- под водой: та же перспектива, камера тонет ---------- */
 const FU=110;
-function pitchAt(t){return -.38+1.25*sm(23.5,28.5,t)-.8*sm(31,35,t)}
+function pitchAt(t){return -.38+1.3*sm(22.2,24.6,t)}
 function creatureA(x,y,t,v,ax,ay,s){
   const lx=(x-ax)/s,ly=(y-ay)/s,sA=lx/15;if(Math.abs(sA)>1.2||Math.abs(ly)>7)return v;
   const bend=1.6*Math.sin(sA*2.2-t*1.4),th=3*Math.pow(Math.max(0,1-sA*sA),.45)*(1+.35*sA)*(1+.45*(fbm(sA*3+1,t*.1)-.5));
@@ -140,9 +140,9 @@ function creatureB(x,y,t,v,ax,ay,s,vis,m){
   return out+lure*sm(30.5,31.5,t);
 }
 function underBuf(t,buf){
-  const u=t-21.6,D=1.2+u*1.1,p=pitchAt(t),cp=Math.cos(p),sp=Math.sin(p),amb=Math.exp(-u/7);
+  const u=t-21.6,D=1.2+u*1.1,p=pitchAt(t),cp=Math.cos(p),sp=Math.sin(p),amb=Math.exp(-u/4.2);
   const wA=[-26+(t-26)*9.5,16,24],aA=[wA[0],wA[1]*cp-wA[2]*sp,wA[1]*sp+wA[2]*cp];
-  const showA=t>25.5&&t<31.8&&aA[2]>1,sA=FU/aA[2],axA=90+aA[0]*sA,ayA=160+aA[1]*sA;
+  const showA=false,sA=FU/aA[2],axA=90+aA[0]*sA,ayA=160+aA[1]*sA;
   const showB=t>=30.5,Zb=Math.max(.9,104*Math.exp(-.54*(t-30.5))),sB=FU/Zb;
   const axB=90+18*Math.sin(t*.4)*(1-sm(33,38,t))+.6*sB*sm(35,39,t),ayB=215+(160-215)*sm(31,36,t)-1.2*sB*sm(34,38.5,t);
   const visB=.45+.5*sm(32,35,t),mB=Math.pow(sm(33.3,37.5,t),.9);
@@ -175,8 +175,8 @@ function underBuf(t,buf){
 const out=document.getElementById('c');out.width=W;out.height=H;
 const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data,UB=new Float32Array(W*H);
 const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
-const CAPS=EN?[[1,5.5,'the lighthouse|is still far'],[25.5,28.5,"don't look down"],[41,45.5,'depth below you|4 kilometers']]
-            :[[1,5.5,'до маяка|ещё далеко'],[25.5,28.5,'не смотри вниз'],[41,45.5,'глубина под тобой|4 километра']];
+const CAPS=EN?[[1,5.5,'the lighthouse|is still far'],[24,27,"don't look down"],[41,45.5,'depth below you|4 kilometers']]
+            :[[1,5.5,'до маяка|ещё далеко'],[24,27,'не смотри вниз'],[41,45.5,'глубина под тобой|4 километра']];
 function text(t,fr){
   mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';mc.font='bold 11px "Courier New",monospace';
   for(const [a,z,s] of CAPS)if(t>=a&&t<z&&(hash(fr,5)>.12||a>40)){
