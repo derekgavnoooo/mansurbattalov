@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Щель под дверью</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* вертикальный кадр 9:16: темнота спальни, свет только из щели; 5 тонов от холодной тьмы к тёплой лампе */
+:root{
+  --void:#040407; --dusk:#14131b; --ash:#302a30; --amber:#7a604a; --lamp:#ecce98;
+  --mono:"Courier New",Courier,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--void);color:var(--lamp);overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#gate{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%;border:0;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--void);color:var(--lamp);font:13px/1.6 var(--mono);text-align:center;cursor:pointer}
+#gate[hidden]{display:none}
+#gate:focus-visible{outline:1px dashed var(--amber);outline-offset:-12px}
+#gate .t{font-size:clamp(18px,5vw,28px);letter-spacing:.2em;color:var(--amber)}
+#gate .w{max-width:36ch;opacity:.55}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Тёмная спальня, полоска света под закрытой дверью"></canvas>
+<button id="gate" type="button">
+  <span class="t">щель под дверью</span>
+  <span id="gl">[ смотреть ]</span>
+  <span class="w">Лучше в наушниках и в темноте.</span>
+</button>
+<script>
+(()=>{
+const W=360,H=640,DUR=46,FPS=12;
+const PAL=[[4,4,7],[20,19,27],[46,37,35],[122,96,74],[236,206,152]];
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
+const DX0=101,DX1=259,DY0=118,GAP0=557,GAP1=561,GY=559;
+
+function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0;
+  h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296}
+function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
+function fbm(x,y){return vn(x,y)*.5+vn(x*2.03+5.2,y*2.03+1.3)*.25+vn(x*4.01+9.1,y*4.01+3.7)*.125}
+const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
+
+/* неподвижная комната: отражающая способность и тип поверхности для каждой точки */
+const ALB=new Float32Array(W*H),REG=new Uint8Array(W*H); // 0 стена, 1 наличник, 2 дверь, 3 пол
+for(let v=0;v<H;v++)for(let u=0;u<W;u++){
+  const i=v*W+u;let a,r;
+  const wall=fbm(u*.045,v*.045)*.6+fbm(u*.31,v*.31)*.4;
+  if(v>=GAP1){r=3;const k=(u-180)/Math.max(4,v-300),f=((k*5)%1+1)%1,s=Math.min(f,1-f);
+    a=.42+.3*fbm(u*.09,v*.025+k)-(1-sm(0,.035,s))*.3;}
+  else if(u>=DX0&&u<DX1&&v>=DY0){r=2;
+    const g=fbm(u*.11+fbm(u*.02,v*.008)*3,v*.007);a=.42+.18*Math.sin(g*22)+.2*g;
+    for(const [y0,y1] of [[150,332],[372,530]]){
+      const dx=Math.min(u-121,239-u),dy=Math.min(v-y0,y1-v);
+      if(dx>=0&&dy>=0){const e=Math.min(dx,dy);a*=e<1.5?.55:e<3.5?1.12:.95}}
+  }else if(u>=92&&u<268&&v>=108){r=1;a=.55+.15*wall-(u<94||u>265||v<110?.15:0)}
+  else{r=0;a=.38+.28*wall}
+  const hd=(u-240)**2+(v-352)**2;if(r===2&&hd<30)a*=.35;
+  ALB[i]=a;REG[i]=r;
+}
+
+/* сюжет */
+function lightOn(t){return t<3?0:t<3.12?1:t<3.22?0:t<30?1:0}
+const CROWD=[[27.3,128],[28,232],[28.5,110],[28.9,150],[29.2,210],[29.5,250],[29.7,140]];
+function feet(t){
+  const F=[];
+  if(t>=12&&t<16){const p=(t-12)/4,xc=60+p*240,s=Math.sin(t*Math.PI*2)*3;F.push([xc-6+s,8],[xc+6-s,8])}
+  if(t>=16.5){const mv=t<19.5,xc=mv?300-(t-16.5)/3*120:180,s=mv?Math.sin(t*Math.PI*2)*3:0;F.push([xc-7+s,8],[xc+8-s,8])}
+  for(const [a,x] of CROWD)if(t>=a){const j=Math.sin(t*3+x)*1.5;F.push([x-6+j,7],[x+6+j,7])}
+  return F;
+}
+const EYES=[[33.2,180],[33.75,140],[34.3,222],[34.85,118],[35.4,160],[35.95,201],[36.5,246],[37.05,104],[37.6,131]];
+function eyesAt(t){
+  if(t<33||t>=39.5)return [];
+  const r=[];EYES.forEach(([a,x],k)=>{if(t<a)return;
+    let o=sm(a,a+.35,t);
+    if(hash(Math.floor((t+k*.37)*1.4),k)<.1)o*=.1;
+    if(t>=38.6&&t<38.9)o=0;
+    r.push([x,o])});
+  return r;
+}
+function zoom(t){return t<30?1+.3*sm(4,30,t):t<33?1.3:1.3+.9*sm(33,39.5,t)}
+const CAPS=[[.5,5.2,['03:40','в коридоре включился свет']],[21,25.5,['я живу один']],[40.3,46.5,['я до сих пор','не открыл дверь']]];
+
+/* кадр */
+const out=document.getElementById('c');out.width=W;out.height=H;
+const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data;
+const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
+const TX=new Float32Array(W),TB1=new Float32Array(W),TB2=new Float32Array(W),DK=new Float32Array(90*160);
+function blur(src,dst,r){for(let x=0;x<W;x++){let s=0,n=0;for(let k=-r;k<=r;k++){const j=x+k;if(j>=0&&j<W){s+=src[j];n++}}dst[x]=s/n}}
+
+function captions(t){
+  mc.clearRect(0,0,W,H);
+  for(const [a,z,lines] of CAPS)if(t>=a&&t<z){
+    mc.font='bold 21px "Courier New",monospace';mc.textAlign='center';mc.textBaseline='top';
+    let n=Math.floor((t-a)*20);
+    lines.forEach((l,k)=>{const s=l.slice(0,Math.max(0,n));n-=l.length;if(!s)return;
+      const w=mc.measureText(l).width+18,y=H*.17+k*34;
+      mc.fillStyle='rgb(255,0,0)';mc.fillRect(W/2-w/2,y-4,w,32);
+      mc.fillStyle='rgb(0,255,0)';mc.fillText(s,W/2,y+1)});
+  }
+  return mc.getImageData(0,0,W,H).data;
+}
+
+function renderFrame(t){
+  const fr=Math.round(t*FPS),black=t>=39.5,md=captions(t);
+  const on=lightOn(t)*(1-.07*hash(fr,11)),dimGap=t>=32.5&&t<39.5?.05:0;
+  const F=lightOn(t)?feet(t):[],E=eyesAt(t),hy=t>=21.5&&t<26?sm(21.5,25.5,t)*6:0;
+  for(let x=0;x<W;x++){let tr=sm(DX0-1,DX0+2,x)*(1-sm(DX1-2,DX1+1,x));
+    for(const [c,w] of F){const d=Math.abs(x-c);tr*=1-.93*(1-sm(w*.45,w,d))}TX[x]=tr}
+  blur(TX,TB1,4);blur(TB1,TB2,22);
+  const dark=t>=30,amp=dark?.07:.05,sp=dark?.14:.04,base=dark?.03:.05+.05*lightOn(t);
+  for(let j=0;j<160;j++)for(let i=0;i<90;i++)DK[j*90+i]=fbm(i*.09+t*sp,j*.09-t*sp*1.3);
+  const z=zoom(t),ay=GY-(z-1)/1.2*140,dx=Math.sin(t*.45)*1.4,dy=Math.sin(t*.31+1)*1.1;
+  for(let y=0;y<H;y++){
+    const v=GY+(y-ay)/z+dy,vi=Math.min(H-1,Math.max(0,Math.round(v))),by=(y&3)*4;
+    for(let x=0;x<W;x++){
+      const o=(y*W+x)*4;let g;
+      if(black)g=0;
+      else{
+        const u=180+(x-180)/z+dx,ui=Math.min(W-1,Math.max(0,Math.round(u))),i=vi*W+ui,r=REG[i];
+        let L=base+amp*DK[(vi>>2)*90+(ui>>2)];
+        if(on>0){
+          L+=on*.2*Math.exp(-Math.hypot(u-180,v-590)/300);
+          if(r===3){const d=v-GAP1,k=Math.min(1,d/50);L+=on*(TB1[ui]+(TB2[ui]-TB1[ui])*k)*Math.exp(-d/48)*2.1}
+          else if((r===2||r===1)&&v<GAP0)L+=on*(TB1[ui]*Math.exp(-(GAP0-v)/3.5)*.6+TB2[ui]*Math.exp(-(GAP0-v)/70)*.22);
+        }
+        let lum=ALB[i]*L;
+        if(u>DX0-2&&u<DX1+2){
+          const gm=sm(556.6,557.4,v)*(1-sm(560.6,561.4,v));
+          if(gm>0)lum+=gm*(on*TX[ui]*1.3+dimGap);
+          if(v>DY0&&v<GAP0)lum+=on*.16*(Math.exp(-Math.abs(u-100.5)*1.6)+Math.exp(-Math.abs(u-259.5)*1.6))*(.3+.7*(v-DY0)/(GAP0-DY0));
+        }
+        const gd=(u-238.6)**2+(v-350.4-hy)**2;if(gd<9)lum+=Math.exp(-gd/1.4)*(.04+.45*on);
+        if(E.length&&Math.abs(v-GY)<5)for(const [ex,eo] of E){
+          const a=(u-ex+3.6)**2+((v-GY-.3)*1.5)**2,b=(u-ex-3.6)**2+((v-GY-.3)*1.5)**2;
+          lum+=eo*1.6*(Math.exp(-a/1.7)+Math.exp(-b/1.7))}
+        g=Math.pow(Math.max(0,lum),.5);
+      }
+      g+=(hash(y*W+x,fr*7+1)-.5)*(.05+.17*(1-Math.min(1,g*2.5)))*(black?.4:1);
+      const nx=(x-180)/180,ny=(y-320)/320;g*=1-.3*(nx*nx+ny*ny)*.5;
+      let l=Math.floor(g*4+BAY[by+(x&3)]);l=l<0?0:l>4?4:l;
+      if(md[o+1]>127)l=4;else if(md[o]>127)l=0;
+      const c=PAL[l];px[o]=c[0];px[o+1]=c[1];px[o+2]=c[2];px[o+3]=255;
+    }
+  }
+  oc.putImageData(img,0,0);
+}
+
+/* звук */
+function buildAudio(ac,out,T0){
+  const sr=ac.sampleRate,M=ac.createGain();M.gain.value=.9;M.connect(out);
+  const nb=ac.createBuffer(1,sr*4,sr),nd=nb.getChannelData(0),bb=ac.createBuffer(1,sr*4,sr),bd=bb.getChannelData(0);let l=0;
+  for(let i=0;i<nd.length;i++){nd[i]=hash(i,77)*2-1;l=(l+.02*(hash(i,78)*2-1))/1.02;bd[i]=l*3.5}
+  const src=(b,loop)=>{const s=ac.createBufferSource();s.buffer=b;s.loop=!!loop;return s};
+  const filt=(ty,f,q)=>{const b=ac.createBiquadFilter();b.type=ty;b.frequency.value=f;b.Q.value=q;return b};
+  const pan=p=>{const n=ac.createStereoPanner();n.pan.value=p;n.connect(M);return n};
+  function burst(t,d,f,q,g,ty,p){t+=T0;const s=src(nb),gg=ac.createGain();
+    gg.gain.setValueAtTime(g,t);gg.gain.exponentialRampToValueAtTime(.0005,t+d);
+    s.connect(filt(ty||'bandpass',f,q)).connect(gg).connect(pan(p||0));s.start(t,(t*1.37)%3);s.stop(t+d+.03)}
+  function tone(t,d,f,g,ty,f2,p){t+=T0;const o=ac.createOscillator(),gg=ac.createGain();o.type=ty||'sine';
+    o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+    gg.gain.setValueAtTime(.0005,t);gg.gain.exponentialRampToValueAtTime(g,t+.008);gg.gain.exponentialRampToValueAtTime(.0005,t+d);
+    o.connect(gg).connect(pan(p||0));o.start(t);o.stop(t+d+.03)}
+  function creak(t,d,f1,f2,bf,g,p){t+=T0;const o=ac.createOscillator(),gg=ac.createGain();o.type='sawtooth';
+    o.frequency.setValueAtTime(f1,t);o.frequency.linearRampToValueAtTime(f2,t+d);
+    gg.gain.setValueAtTime(0,t);gg.gain.linearRampToValueAtTime(g,t+d*.3);gg.gain.linearRampToValueAtTime(0,t+d);
+    o.connect(filt('bandpass',bf,8)).connect(gg).connect(pan(p||0));o.start(t);o.stop(t+d+.05)}
+  const step=(t,p,g)=>{burst(t,.05,260,.7,g,'lowpass',p);tone(t,.13,68,g*.9,'sine',40,p)};
+  const rt=src(bb,true),rg=ac.createGain();
+  rg.gain.setValueAtTime(.28,T0);rg.gain.setValueAtTime(.28,T0+39.48);rg.gain.linearRampToValueAtTime(0,T0+39.52);
+  rg.gain.setValueAtTime(0,T0+40.2);rg.gain.linearRampToValueAtTime(.14,T0+41);
+  rt.connect(filt('lowpass',320,.7)).connect(rg).connect(M);rt.start(T0);rt.stop(T0+DUR);
+  [[100,.012],[200,.005]].forEach(([f,g])=>{const o=ac.createOscillator(),gg=ac.createGain();o.frequency.value=f;
+    gg.gain.setValueAtTime(0,T0);gg.gain.setValueAtTime(0,T0+3);gg.gain.linearRampToValueAtTime(g,T0+3.05);
+    gg.gain.setValueAtTime(g,T0+30);gg.gain.linearRampToValueAtTime(0,T0+30.04);
+    o.connect(filt('lowpass',600,.7)).connect(gg).connect(M);o.start(T0);o.stop(T0+31)});
+  burst(3,.02,1800,2,.35,'bandpass',-.1);burst(3.13,.02,1800,2,.3,'bandpass',-.1);burst(30,.02,1800,2,.4,'bandpass',.05);
+  creak(6.5,.7,120,82,620,.05,-.7);creak(9.8,.55,105,90,540,.04,.6);
+  for(let t=12.1;t<16;t+=.5)step(t,-.8+(t-12)/4*1.6,.35);
+  for(let t=16.6;t<19.6;t+=.5)step(t,.8-(t-16.5)/3*.8,.4);
+  creak(21.5,1.6,640,520,2400,.018,.25);burst(26,.03,3000,3,.3,'bandpass',.25);
+  for(let k=0;k<44;k++){const t=27.3+hash(k,5)*2.65;step(t,hash(k,6)*1.6-.8,.2+.25*hash(k,7))}
+  EYES.forEach(([a,x],k)=>{const s=src(nb,true),gg=ac.createGain(),per=2.4+hash(k,9)*1.2;
+    gg.gain.setValueAtTime(0,T0+a);
+    for(let t=a+.2;t+per<39.45;t+=per){gg.gain.linearRampToValueAtTime(.06,T0+t+per*.35);gg.gain.linearRampToValueAtTime(0,T0+t+per*.45);
+      gg.gain.linearRampToValueAtTime(.09,T0+t+per*.6);gg.gain.linearRampToValueAtTime(0,T0+t+per*.98)}
+    gg.gain.setValueAtTime(0,T0+39.5);
+    s.connect(filt('bandpass',480+hash(k,10)*500,.9)).connect(gg).connect(pan((x-180)/120));
+    s.start(T0+a,hash(k,11)*3);s.stop(T0+39.5)});
+  for(const t of [43.2,43.55,43.9]){burst(t,.09,380,.7,.9,'lowpass');tone(t,.16,110,.7,'sine',70)}
+}
+async function audioWav(){
+  const sr=44100,ctx=new OfflineAudioContext(2,sr*DUR,sr);buildAudio(ctx,ctx.destination,0);
+  const ab=await ctx.startRendering(),L=ab.getChannelData(0),R=ab.getChannelData(1),n=L.length;
+  const buf=new ArrayBuffer(44+n*4),dv=new DataView(buf),ws=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF');dv.setUint32(4,36+n*4,true);ws(8,'WAVEfmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);
+  dv.setUint16(22,2,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*4,true);dv.setUint16(32,4,true);dv.setUint16(34,16,true);
+  ws(36,'data');dv.setUint32(40,n*4,true);
+  for(let i=0;i<n;i++){dv.setInt16(44+i*4,Math.max(-1,Math.min(1,L[i]))*32767,true);dv.setInt16(46+i*4,Math.max(-1,Math.min(1,R[i]))*32767,true)}
+  const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));
+  return btoa(s);
+}
+window.renderFrame=renderFrame;window.audioWav=audioWav;window.DUR=DUR;window.FPS=FPS;
+
+/* живой показ */
+const gate=document.getElementById('gate');let ac=null,T0=0,st=0,lastFr=-1,run=false;
+function loop(now){
+  if(!run)return;requestAnimationFrame(loop);
+  const t=ac?ac.currentTime-T0:(now-st)/1000;
+  if(t>DUR){run=false;document.getElementById('gl').textContent='[ смотреть ещё раз ]';gate.hidden=false;return}
+  const fr=Math.floor(Math.max(0,t)*FPS);if(fr!==lastFr){lastFr=fr;renderFrame(fr/FPS)}
+}
+gate.addEventListener('click',()=>{
+  try{if(ac)ac.close();ac=new (window.AudioContext||window.webkitAudioContext)();T0=ac.currentTime+.1;buildAudio(ac,ac.destination,T0)}catch(e){ac=null}
+  st=performance.now();lastFr=-1;gate.hidden=true;run=true;requestAnimationFrame(loop);
+});
+renderFrame(0);gate.focus();
+})();
+</script>
+</body>
+</html>
