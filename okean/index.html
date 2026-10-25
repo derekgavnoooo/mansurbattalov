@@ -45,12 +45,12 @@ const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t
 const EN=window.LANG==='en'||location.hash==='#en';
 
 /* ---------- над водой ---------- */
-const H0=128,LX=52,FOC=60;
-const OBJ=[[3.5,3.2,14,46,6,1,.3,1],[6.5,3,-11,30,5,1.6,0,2],[9,2.6,6,24,7,.8,.6,3],[9.6,2.4,8.5,24,5,.7,-.4,4],[11.8,3.4,-4,13,9,1,.8,5]];
-for(let k=0;k<9;k++)OBJ.push([14.6+k*.35,2.6,-14+k*3,8.5,4+3*hash(k,77),.9,.15,10+k]);
+const H0=128,LX=52,FOC=60,MX=128,MY=42;
+const OBJ=[[3.5,3.2,12,46,6,1,.3,1],[6.5,3,-11,30,5,1.6,0,2],[9,2.6,10,24,7,.8,.6,3],[9.6,2.4,13,24,5,.7,-.4,4],[11.8,3.4,6,13,9,1,.8,5]];
+for(let k=0;k<9;k++)OBJ.push([14.6+k*.35,2.6,-14+k*3.4,8.5,4+3*hash(k,77),.9,.15,10+k]);
 OBJ.push([18.3,2.4,1.5,3.2,14,1.3,.9,30]);
-function roll(t){return (.035*Math.sin(.8*t)+.02*Math.sin(1.7*t+1))*(1+1.5*sm(14,19,t))+1.9*Math.pow(sm(20,21.4,t),2)}
-function bob(t){return 3*Math.sin(.9*t)*(1+sm(14,19,t))+160*sm(20.3,21.5,t)}
+function roll(t){return (.035*Math.sin(.8*t)+.02*Math.sin(1.7*t+1))*(1+1.5*sm(14,19,t))+1.25*Math.pow(sm(19.8,21.3,t),1.6)}
+function bob(t){return 3*Math.sin(.9*t)*(1+sm(14,19,t))+190*Math.pow(sm(20.4,21.5,t),2)}
 const beamA=t=>t*1.1;
 function above(x,y,t){
   const a=roll(t),c=Math.cos(a),s=Math.sin(a),dx=x-90,dy=y-230;
@@ -58,125 +58,146 @@ function above(x,y,t){
   const th=beamA(t),face=Math.pow(Math.max(0,Math.cos(th)),8);
   let v;
   if(sy<H0){
-    v=.05+.08*(sy/H0)+.09*fbm(sx*.02+t*.01,sy*.05);
-    v+=.08*Math.exp(-Math.hypot(sx-140,sy-40)/18);
+    v=.13+.12*Math.pow(sy/H0,2);
+    const cl=fbm(sx*.014+t*.008,sy*.045);v+=.16*sm(.45,.75,cl)*(.5+.5*Math.exp(-Math.hypot(sx-MX,sy-MY)/60))-.05*sm(.3,.45,cl);
+    const md=Math.hypot(sx-MX,sy-MY);v+=.3*Math.exp(-md/14);if(md<5.5+.6*(fbm(sx*.5,sy*.5)-.5))v=.95-.15*fbm(sx*.6,sy*.6);
+    if(sy>H0-2.5)v+=.06;
     const lx=LX,ly=H0-22,bd=[Math.sin(th),-.05],ox=sx-lx,oy=sy-ly,al=ox*bd[0]+oy*bd[1];
-    if(al>0){const pr=Math.abs(ox*bd[1]-oy*bd[0]);v+=.22*Math.exp(-pr*pr/(2*(1+al*.09)**2))*Math.exp(-al/150)}
-    if(sy>H0-22&&Math.abs(sx-lx)<1.6+(sy-(H0-22))*.07)v=.03+.04*((sy|0)%5<2?1:0);
-    const ld=Math.hypot(sx-lx,sy-ly);v+=(.6+1.4*face)*Math.exp(-ld*ld/3)+(.06+.35*face)*Math.exp(-ld/10);
+    if(al>0){const pr=Math.abs(ox*bd[1]-oy*bd[0]);v+=.25*Math.exp(-pr*pr/(2*(1+al*.09)**2))*Math.exp(-al/150)}
+    if(sy>H0-22&&Math.abs(sx-lx)<1.6+(sy-(H0-22))*.07)v=.03+.03*((sy|0)%5<2?1:0);
+    const ld=Math.hypot(sx-lx,sy-ly);v+=(.6+1.4*face)*Math.exp(-ld*ld/3)+(.05+.35*face)*Math.exp(-ld/10);
   }else{
     const d=sy-H0,z=FOC/(d+.6),u=(sx-90)*z*.05;
-    const w=fbm(u*.22+t*.04,z*1.1-t*.3)+.5*fbm(u*.6+3,z*2.6-t*.5);
-    v=.05+.06*w+.06*Math.exp(-d/8);
-    let glint=w>.85?(w-.85)*1.4:0;
-    const rw=1+d*.2;v+=Math.exp(-Math.abs(sx-LX)/rw)*(.03+.5*face)*sm(.68,.85,w)*Math.exp(-d/45);
+    const w=fbm(u*.22+t*.04,z*1.1-t*.3)+.5*fbm(u*.6+3,z*2.6-t*.5),w2=fbm(u*.9+7,z*4-t*.7);
+    v=.025+.03*w;
+    const path=Math.exp(-Math.abs(sx-MX)/(1.5+d*.42));
+    let gl=sm(.38,.62,w2*.6+w*.35)*path*1.4+sm(.78,.9,w2)*.2*Math.exp(-d/70);
+    gl+=Math.exp(-Math.abs(sx-LX)/(1+d*.2))*.5*face*sm(.6,.8,w2)*Math.exp(-d/45);
     if(t>14&&t<19){const S=FOC/7.5,mx=90+(-22+(t-14)*8)*S,my=H0+S,q=((sx-mx)/(S*11))**2+((sy-my)/(S*1.1))**2;
-      const k=1-sm(.6,1,q);v*=1-.65*k;glint*=1-k}
-    v+=glint;
-    for(const [t0,dur,X,Z,h,w2,bend,sd] of OBJ){if(t<t0||t>t0+dur+2)continue;
-      const S=FOC/Z,bx=90+X*S,by=H0+S,rr=(t-t0)*.9+.2,q=Math.hypot((sx-bx)/(S*w2*2.2),(sy-by)/(S*w2*.55));
-      v+=.14*Math.exp(-(((q-rr)/.18)**2))*Math.exp(-(t-t0)/3)}
+      const k=1-sm(.6,1,q);v*=1-.65*k;gl*=1-k}
+    v+=gl;
+    for(const [t0,dur,X,Z,h,w3,bend,sd] of OBJ){if(t<t0||t>t0+dur+2)continue;
+      const S=FOC/Z,bx=90+X*S,by=H0+S,rr=(t-t0)*.9+.2,q=Math.hypot((sx-bx)/(S*w3*2.2),(sy-by)/(S*w3*.55));
+      v+=.18*Math.exp(-(((q-rr)/.18)**2))*Math.exp(-(t-t0)/3)}
   }
   for(const [t0,dur,X,Z,h,w2,bend,sd] of OBJ){
     if(t<t0||t>t0+dur)continue;
     const e=sm(t0,t0+dur*.35,t)*(1-sm(t0+dur*.65,t0+dur,t)),S=FOC/Z,bx=90+X*S,by=H0+S;
     const ry=(by-sy)/(h*1.4*S);if(ry<0||ry>e)continue;
     const r=ry+(1-e),wd=w2*1.3*S*.5*Math.pow(Math.max(0,1-r),.6)*(1+.4*(fbm(r*6+sd,t*.5)-.5));
-    const off=bend*S*h*1.4*r*r*(.3*Math.sin(t*1.2+sd)+1)*.35;
-    const ox=sx-(bx+off);
-    if(Math.abs(ox)<wd){v=.015+.05*fbm(r*14+sd,ox*.5)+(ox<-wd*.4?.09*face+.03:0)}
+    const off=bend*S*h*1.4*r*r*(.3*Math.sin(t*1.2+sd)+1)*.35,ox=sx-(bx+off);
+    if(Math.abs(ox)<wd)v=.01+.03*fbm(r*14+sd,ox*.5)+(ox>wd*.35?.07:0)+(ox<-wd*.4?.08*face:0);
   }
-  if(t>20.5&&t<21.7){const k=Math.sin(Math.PI*sm(20.5,21.7,t));v=Math.max(v,sm(.55,.72,fbm(x*.08+t*3,y*.08-t*5))*k*.95)}
-  /* борт лодки внизу кадра */
-  const gy=284+320*sm(20.5,21.2,t)+9*((x-90)/90)**2+3*(fbm(x*.04,7)-.5),gd=y-gy;
+  if(t>20.6&&t<21.7){const k=Math.sin(Math.PI*sm(20.6,21.7,t));v=Math.max(v,sm(.5,.7,fbm(x*.08+t*3,y*.08-t*5))*k*.95)}
+  const gy=284+340*sm(20.5,21.1,t)+9*((x-90)/90)**2+3*(fbm(x*.04,7)-.5),gd=y-gy;
   if(gd>0){let b=.04+.05*fbm(x*.15,y*.04)+.02*Math.max(0,Math.sin(y*.9+fbm(x*.05,y*.1)*3));
-    if(gd<5)b=.09+.12*(1-gd/5)*(.7+.6*fbm(x*.3,y*.3));
+    if(gd<5)b=.12+.14*(1-gd/5)*(.7+.6*fbm(x*.3,y*.3));
     v=b+.05*face*(gd<5?1:.3)}
   return v;
 }
 
-/* ---------- под водой ---------- */
-const BUB=[];for(let k=0;k<70;k++){const late=k>55;BUB.push([10+160*hash(k,1),late?24+hash(k,2)*14:21.6+hash(k,2)*2.6,25+35*hash(k,3),.8+1.6*hash(k,4)])}
-function eye(v,x,y,R,open,seed,t){
-  const dx=x/R,dy=y/R,ax=Math.abs(dx);
-  if(ax>1.5||Math.abs(dy)>1.25)return v;
-  const sh=ax<1?Math.pow(1-dx*dx,.8):0,nt=fbm(dx*2.2+seed,t*.25),nb=fbm(dx*2.2+seed+9,t*.2);
-  const top=-(.58*open*sh)*(.8+.4*nt),bot=(.42*open*sh)*(.8+.4*nb);
-  const dTop=dy-top,dBot=bot-dy,inside=Math.min(dTop,dBot);
-  if(inside<=0){if(ax<1.3){const out=-inside,fold=dy<0?Math.abs(out-.17-.06*nt):Math.abs(out-.13-.05*nb);
-    v-=Math.exp(-fold*fold/.0018)*(1-ax*.6)*.05}return v}
-  const ir=Math.hypot(dx,dy),ang=Math.atan2(dy,dx),Rir=.43*(1+.1*(fbm(ang*1.3+seed,t*.05)-.5)),Rp=.13*(.96+.12*(fbm(ang*1.7,t*.3)-.5));
-  const w=fbm(x*.9+seed,y*.9),vv=fbm5(x*1.1+w*1.5,y*1.1-w*1.5),vein=Math.max(0,1-Math.abs(vv-.5)*10)*(.45+.6*ax);
-  const s=.62+.14*fbm(x*.5,y*.5)-vein*.4-ax*ax*.28;
-  const q=fbm5(ang*5+fbm(ir*9+seed,ang*2)*1.8+seed,ir*12+seed),iv=(.25+.4*q)*(.5+.5*sm(Rir,Rir*.7,ir)),ib=sm(Rir*1.07,Rir*.9,ir);
-  let e=s*(1-ib)+iv*ib;const pb=sm(Rp*1.12,Rp*.9,ir);e=e*(1-pb)+.01*pb;
-  e*=.4+.6*sm(0,.2,dTop);e*=.55+.45*sm(0,.12,dBot);
-  return v*(1-sm(0,.04,inside))+e*sm(0,.04,inside);
+/* ---------- под водой: та же перспектива, камера тонет ---------- */
+const FU=110;
+function pitchAt(t){return -.38+1.25*sm(23.5,28.5,t)-.8*sm(31,35,t)}
+function creatureA(x,y,t,v,ax,ay,s){
+  const lx=(x-ax)/s,ly=(y-ay)/s,sA=lx/15;if(Math.abs(sA)>1.2||Math.abs(ly)>7)return v;
+  const bend=1.6*Math.sin(sA*2.2-t*1.4),th=3*Math.pow(Math.max(0,1-sA*sA),.45)*(1+.35*sA)*(1+.45*(fbm(sA*3+1,t*.1)-.5));
+  let e=Math.abs(ly-bend)-th+.9*(fbm(lx*.5,ly*.5)-.5)+.3*(fbm(lx*2,ly*2)-.5);
+  if(ly<bend)e-=1.3*Math.pow(Math.max(0,Math.sin(lx*1.25+2*fbm(lx*.3,1))),7)*(1-Math.abs(sA));
+  if(e>=0)return v;
+  let c=.05+.06*fbm5(lx*.7,ly*.7);if(ly-bend<-th*.5)c+=.06*(.5+fbm(lx*.4,ly));if(e>-.35)c+=.05;
+  const gx=Math.floor(lx/1.7),gy=Math.floor(ly/1.7);
+  if(hash(gx+300,gy)<.3){const cx=(gx+.2+.6*hash(gx,gy+1))*1.7,cy=(gy+.2+.6*hash(gx+2,gy))*1.7,d2=(lx-cx)**2+(ly-cy)**2;c+=.9*Math.exp(-d2/.12)*(.6+.4*Math.sin(t*3+gx))}
+  const ed=Math.hypot(lx-12.6,ly-(bend-.6));if(ed<.55)c=Math.abs(lx-12.6)<.07?.02:.4*(1-ed/.55)+.1;
+  return v*.15+c;
 }
-const DOTS=[];for(let k=0;k<34;k++){const a=k/34*TAU+hash(k,9)*.15,r=.86+.1*hash(k,8);DOTS.push([3.4*r*Math.cos(a),2.6*r*Math.sin(a),hash(k,7)*6])}
-for(let k=0;k<14;k++)DOTS.push([(hash(k,5)-.5)*5,(hash(k,6)-.5)*3.6,hash(k,4)*6]);
-function below(x,y,t){
-  const u=t-21.6,ys=70-u*13,ysx=ys+4*Math.sin(x*.07+t*2)+6*(fbm(x*.04,t*.6)-.5);
-  let v;
-  if(y<ysx){v=.32+.3*fbm(x*.05+t*.2,y*.08)+.35*sm(.6,.8,fbm(x*.09+fbm(x*.03,t*.3)*2,t*.4));
-    const hx=(x-102)/40,hy=(y-ysx+3)/8;if(hx*hx+hy*hy<1)v=.03}
-  else{const amb=.13*Math.exp(-u/4.5);
-    v=.02+amb*Math.exp(-(y-Math.max(ys,0))/110);
-    const rays=fbm(x*.045+y*.012,t*.12);v+=(.12*Math.exp(-u/5))*sm(.5,.78,rays)*Math.exp(-(y-ys)/160)}
-  if(hash(Math.floor((x+t*3)/2),Math.floor((y+t*7)/2))>.996)v+=.18*Math.exp(-u/12)+.05;
-  /* существо */
-  if(t>=28.5){
-    const S=Math.min(260,18*Math.exp(.25*(t-29))),f=.6*sm(33,39,t),yo=(1-sm(29,35,t))*80;
-    const ux=(x-90)/S,uy=(y-160-yo)/S+f,vis=.25+.6*sm(30,38,t)*1;
-    const ang=Math.atan2(uy,ux),e=Math.hypot(ux/3.4,uy/2.6)*(1+.12*(fbm(ang*2+3,t*.2)-.5));
-    if(e<1.05){
-      let cv=.05+.05*fbm5(ux*2,uy*2)+.025*fbm(ux*9,uy*9);
-      cv=eye(cv,ux*8,(uy+.9)*8,6,sm(29.5,31,t),3,t);
-      const m=Math.pow(sm(33,39,t),1.2),mry=1.5*m+.04,em=Math.hypot(ux/2.4,(uy-.65)/mry);
-      if(em<1.08){
-        if(em>=1)cv*=.5;else{
-          const th=Math.atan2((uy-.65)/mry,ux/2.4),qq=(th+Math.PI)/TAU*34,k=Math.floor(qq),uu=qq-k;
-          const cu=uu+(1-em)*(hash(k,5)-.5)*3+.3*(fbm(ux*3+k,uy*3)-.5)+.12*(fbm(ux*11,uy*11)-.5);
-          const tp=Math.max(0,1-Math.abs(cu-.5)/(.22+.3*hash(k,11))),len=(.1+.26*hash(k,7))*Math.pow(tp,.6)*(1+.7*(fbm(k*1.7,em*6+ux)-.5));
-          cv=em>1-len&&hash(k,13)>.15?.1+.12*fbm(ux*16,uy*16)+.05*fbm(ux*40,uy*40)-(1-em)/Math.max(.01,len)*.08:.004+.01*fbm(ux*5,uy*5)}}
-      const soft=1-sm(.92,1.05,e);
-      v=v*(1-soft*vis)+cv*soft*vis;
+const BEYE=[[-3.4,-2.2,.55],[2.9,-3.1,.38],[-1.1,-3.8,.22],[4.1,-1.2,.18]];
+function creatureB(x,y,t,v,ax,ay,s,vis,m){
+  const lx=(x-ax)/s,ly=(y-ay)/s;let out=v;
+  const ex=1.5+.7*Math.sin(t*1.3),ey=-9+.5*Math.cos(t*1.1),ld=Math.hypot(lx-ex,ly-ey);
+  const lure=1.2*Math.exp(-ld*ld/(2*.32*.32))+.22*Math.exp(-ld/1.3);
+  const r=Math.hypot(lx,ly*1.15),th=Math.atan2(ly*1.15,lx);
+  if(r<11){
+    const R=6.2*(1+.32*(fbm(th*1.1+3,1.7)-.5)*2+.14*(fbm(th*3.7,4)-.5));
+    const e=r-R+.6*(fbm(lx*.6,ly*.6)-.5);
+    const sx2=lx-(1+.25*(ey+5.5)),sy2=ly+5.5;
+    if(sy2<0&&sy2>ey+5.5&&Math.abs(lx-(1+(ex-1)*((-sy2)/(5.5-(-ey))**.5)))<.12)out=out*.6;
+    if(e<0){
+      let c=.05+.06*fbm5(lx*.5,ly*.5);if(ly<-R*.55)c+=.05;if(e>-.4)c+=.05;
+      const gx=Math.floor(lx/1.4),gy=Math.floor(ly/1.4);
+      if(hash(gx+700,gy)<.16){const cx=(gx+.2+.6*hash(gx,gy+3))*1.4,cy=(gy+.2+.6*hash(gx+4,gy))*1.4;c+=.6*Math.exp(-((lx-cx)**2+(ly-cy)**2)/.05)}
+      const op=sm(31.6,32.6,t);
+      for(const [bx,by,br] of BEYE){const d=Math.hypot(lx-bx,(ly-by)/Math.max(.05,op));if(d<br)c=Math.abs(lx-bx)<br*.13?.02:.25+.6*Math.sqrt(1-d/br)}
+      const mx=lx+.6,my=ly-1.2,rm=Math.hypot(mx/1.35,my),tm=Math.atan2(my,mx/1.35);
+      const Rm=m*4.4*(1+.38*(fbm(tm*1.6+7,t*.1)-.5)*2)+.05;
+      if(rm<Rm*1.08){
+        if(rm>=Rm)c*=.4;else{c=.003;
+          const kk=(tm+Math.PI)/TAU*23+1.7*(fbm(tm*2.5,2)-.5),k=Math.floor(kk),uu=kk-k,len=Rm*(.08+.55*hash(k,7)**1.5),al=(Rm-rm)/len;
+          if(al<1&&hash(k,13)>.25){const cu=uu+al*(hash(k,5)-.5)*1.8+.25*(fbm(rm*3,k)-.5),wd=.1*Math.pow(1-al,.8);if(Math.abs(cu-.5)<wd)c=.22+.15*fbm(lx*6,ly*6)}}}
+      out=out*(1-vis)+c*vis;
     }
-    const dv=sm(30.5,33,t);
-    if(dv>0)for(const [px,py,ph] of DOTS){const d=Math.hypot(ux-px,uy-py);if(d<.4)v+=dv*.7*(.6+.4*Math.sin(t*2+ph))*Math.exp(-d*d/(2*.055*.055))}
   }
-  /* пузыри */
-  for(const [bx0,tb,sp,r] of BUB){if(t<tb)continue;const by=330-sp*(t-tb);if(by<-5||Math.abs(y-by)>r+1)continue;
-    const bx=bx0+3*Math.sin((t-tb)*4+bx0);const d=Math.hypot(x-bx,(y-by)*1.1);if(d<r)v=Math.max(v,d>r*.55?.55:.25)}
-  return v;
+  return out+lure*sm(30.5,31.5,t);
+}
+function underBuf(t,buf){
+  const u=t-21.6,D=1.2+u*1.1,p=pitchAt(t),cp=Math.cos(p),sp=Math.sin(p),amb=Math.exp(-u/7);
+  const wA=[-26+(t-26)*9.5,16,24],aA=[wA[0],wA[1]*cp-wA[2]*sp,wA[1]*sp+wA[2]*cp];
+  const showA=t>25.5&&t<31.8&&aA[2]>1,sA=FU/aA[2],axA=90+aA[0]*sA,ayA=160+aA[1]*sA;
+  const showB=t>=30.5,Zb=Math.max(.9,104*Math.exp(-.54*(t-30.5))),sB=FU/Zb;
+  const axB=90+18*Math.sin(t*.4)*(1-sm(33,38,t))+.6*sB*sm(35,39,t),ayB=215+(160-215)*sm(31,36,t)-1.2*sB*sm(34,38.5,t);
+  const visB=.45+.5*sm(32,35,t),mB=Math.pow(sm(33.3,37.5,t),.9);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const rx=(x-90)/FU,ry=(y-160)/FU,dx=rx,dy=ry*cp+sp,dz=-ry*sp+cp,L=Math.hypot(dx,dy,dz),ny=dy/L;
+    let v=(.02+.08*amb)*(.3+.7*sm(.7,-.7,ny));
+    if(dy<0){const ts=D/(-dy),wx=dx*ts,wz=dz*ts,fo=Math.exp(-ts*L/14);
+      const c=fbm(wx*.22+fbm(wx*.07,wz*.07+t*.15)*2.2,wz*.22+t*.25);
+      let sv=(.22+.78*sm(.5,.78,c))*(.45+.55*amb);
+      const bx=(wx-.4)/1.2,bz=(wz-3.2)/2.8;if(bx*bx+bz*bz<1+.25*(fbm(wx*2,wz*2)-.5))sv=.015;
+      v=v*(1-fo)+sv*fo}
+    v+=.1*amb*sm(.55,.85,fbm(Math.atan2(dx,dz)*7+3,t*.08))*(1-sm(-.3,.5,ny))*(1-sm(.3,.9,ny));
+    if(showA)v=creatureA(x,y,t,v,axA,ayA,sA);
+    if(showB)v=creatureB(x,y,t,v,axB,ayB,sB,visB,mB);
+    buf[y*W+x]=v;
+  }
+  const dot=(sx,sy,b,r)=>{for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const X=Math.round(sx)+i,Y=Math.round(sy)+j;
+    if(X>=0&&X<W&&Y>=0&&Y<H&&i*i+j*j<=r*r+.5)buf[Y*W+X]+=b*(r&&i*i+j*j<r*r-.5?.35:1)}};
+  for(let k=0;k<260;k++){
+    const x0=(hash(k,1)-.5)*14,z0=1+hash(k,3)*14,yw=((hash(k,2)*14-u*1.6*(.6+.4*hash(k,5)))%14+14)%14-7;
+    const cy=yw*cp-z0*sp,cz=yw*sp+z0*cp;if(cz<.4)continue;
+    dot(90+x0/cz*FU,160+cy/cz*FU,.35*Math.exp(-cz/9)*(.5+.5*amb)+.05,cz<2?1:0)}
+  for(let k=0;k<55;k++){const tb=21.6+hash(k,7)*2.4;if(t<tb)continue;
+    const x0=(hash(k,8)-.5)*4,z0=.8+hash(k,9)*4,yw=2-(2+2.5*hash(k,10))*(t-tb);if(yw<-6)continue;
+    const cy=yw*cp-z0*sp,cz=yw*sp+z0*cp;if(cz<.3)continue;
+    dot(90+x0/cz*FU,160+cy/cz*FU,.4,Math.max(1,Math.min(4,Math.round(.12/cz*FU*.2))))}
 }
 
 /* ---------- кадр ---------- */
 const out=document.getElementById('c');out.width=W;out.height=H;
-const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data;
+const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data,UB=new Float32Array(W*H);
 const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
-const CAPS=EN?[[1,5.5,'the lighthouse|is still far'],[26,29,"don't look down"],[41,45.5,'depth below you|4 kilometers']]
-            :[[1,5.5,'до маяка|ещё далеко'],[26,29,'не смотри вниз'],[41,45.5,'глубина под тобой|4 километра']];
+const CAPS=EN?[[1,5.5,'the lighthouse|is still far'],[25.5,28.5,"don't look down"],[41,45.5,'depth below you|4 kilometers']]
+            :[[1,5.5,'до маяка|ещё далеко'],[25.5,28.5,'не смотри вниз'],[41,45.5,'глубина под тобой|4 километра']];
 function text(t,fr){
   mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';mc.font='bold 11px "Courier New",monospace';
   for(const [a,z,s] of CAPS)if(t>=a&&t<z&&(hash(fr,5)>.12||a>40)){
-    s.split('|').forEach((l,k)=>{const y=(a>40?H*.47:a>20?H*.2:H*.13)+k*15,ox=(hash(fr,k+9)-.5)*1.2,oy=(hash(fr,k+19)-.5)*1.2;
+    s.split('|').forEach((l,k)=>{const y=(a>40?H*.47:a>20?H*.2:H*.22)+k*15,ox=(hash(fr,k+9)-.5)*1.2,oy=(hash(fr,k+19)-.5)*1.2;
       mc.fillStyle='rgb(255,0,0)';mc.fillText(l,W/2+1+ox,y+1+oy);mc.fillStyle='rgb(0,255,0)';mc.fillText(l,W/2+ox,y+oy)});
   }
   return mc.getImageData(0,0,W,H).data;
 }
 const tear=fr=>{const t=fr/FPS;return hash(fr,31)<.015+(t>21&&t<39.4?.06*sm(28,39,t):0)||Math.abs(t-21.6)<.15};
 function renderFrame(t){
-  const fr=Math.round(t*FPS),md=text(t,fr),black=t>=39.4,tr=tear(fr);
+  const fr=Math.round(t*FPS),md=text(t,fr),black=t>=39.4,tr=tear(fr),uw=t>=21.6&&!black;
+  if(uw)underBuf(t,UB);
   const scr=hash(fr,44)<.3?(hash(fr,45)*W|0):-1;
   for(let y=0;y<H;y++){
-    let sh=0;if(tr&&hash(y>>2,fr)<.35)sh=(hash(y>>3,fr+3)-.5)*24;
+    let sh=0;if(tr&&hash(y>>2,fr)<.35)sh=((hash(y>>3,fr+3)-.5)*24)|0;
     const by=(y&3)*4;
     for(let x=0;x<W;x++){
       const i=y*W+x,o=i*4;let v=0;
-      if(!black)v=t<21.6?above(x+sh,y,t):below(x+sh,y,t);
+      if(!black)v=uw?UB[y*W+Math.min(W-1,Math.max(0,x+sh))]:above(x+sh,y,t);
       v=Math.pow(Math.max(0,v),.6);
-      v+=(hash(i,fr*7+1)-.5)*(black?.04:.13);
+      v+=(hash(i,fr*7+1)-.5)*(black?.04:.12);
       if(x===scr&&!black)v+=.3*hash(y>>2,fr);
       const nx=(x-90)/90,ny=(y-160)/160;v*=1-.3*(nx*nx+ny*ny)*.5;
       let l=Math.floor(v*4+BAY[by+(x&3)]);l=l<0?0:l>4?4:l;

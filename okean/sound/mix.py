@@ -106,13 +106,13 @@ fin = np.zeros((N, 2))
 for t in (40.4, 41.7): s_ = int(t * SR); x_ = env(hz, .001, .1)[:N - s_]; fin[s_:s_ + len(x_)] += x_ * .5
 # глаз открылся: протяжный стон кита
 moan = filt(add(resample(stretch(choirH, 1.5), .3), resample(stretch(scream, 1.6), .28), .5), hi=600)
-put(under, env(moan, .8, 1.5), 29.4, .9, wet=.8)
-put(under, env(moan[::-1], .8, 1.5), 34.2, .8, wet=.8)
+put(under, env(moan, .8, 1.5), 27.4, .8, wet=.8)
+put(under, env(moan[::-1], .8, 1.5), 31.5, .9, wet=.8)
 # светящиеся точки: тонкий хор сверху
 put(under, env(filt(resample(choirA[::-1], 1.4), lo=900, hi=5000), 1.5, 2), 30.6, .18, wet=.9)
 # пасть открывается: огромный вдох, засасывает
 inhale = filt(resample(stretch(breath, 3.5), .28), hi=900)
-put(under, env(inhale, 2, .4)[:int(6 * SR)], 33.2, 1.1, wet=.5)
+put(under, env(inhale, 2, .4)[:int(6 * SR)], 33.4, 1.1, wet=.5)
 put(under, env(filt(resample(stretch(storm, 1.2), .4), hi=250), 2, .3)[:int(6.2 * SR)], 33.2, 1.0, wet=.3)
 for t in (36.1, 37.6, 38.7): put(under, env(filt(resample(bone, .4), hi=1500), .001, .2), t, .6, pan=rng.uniform(-.5, .5), wet=.5)
 
