@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Окно напротив</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* вертикальный кадр 9:16: ночная панелька через стекло; 6 тонов натрия, к концу палитра гниёт */
+:root{
+  --void:#05060c; --night:#141624; --smog:#302a38; --brick:#68483e; --sodium:#b0703a; --lamp:#f6d696;
+  --mono:"Courier New",Courier,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--void);color:var(--lamp);overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#gate{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%;border:0;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--void);color:var(--lamp);font:13px/1.6 var(--mono);text-align:center;cursor:pointer}
+#gate[hidden]{display:none}
+#gate:focus-visible{outline:1px dashed var(--sodium);outline-offset:-12px}
+#gate .t{font-size:clamp(18px,5vw,28px);letter-spacing:.2em;color:var(--sodium)}
+#gate .w{max-width:36ch;opacity:.55}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Ночной вид из окна на многоэтажку напротив"></canvas>
+<button id="gate" type="button">
+  <span class="t">окно напротив</span>
+  <span id="gl">[ смотреть ]</span>
+  <span class="w">Со звуком. Резкие помехи и мерцание.</span>
+</button>
+<script>
+(()=>{
+const W=360,H=640,DUR=51,FPS=12;
+const PAL0=[[5,6,12],[20,22,36],[48,42,56],[104,72,62],[176,112,58],[246,214,150]];
+const PALS=[[8,3,5],[30,10,16],[70,26,30],[128,44,36],[196,90,52],[240,190,140]];
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
+const X0=40,PX=41,WW=22,Y0=84,PY=36,WH=22,NC=7,NR=12,TC=3,TR=7,TK=TR*NC+TC;
+const ROOF=74,BASE=520,G0=24,G1=336,GT=36,GB=604,M0=244,M1=254;
+const LAMP_IN=[90,470],LAMP_OUT=[70,540],CUTS=[22,28,36,40.5,45];
+
+function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0;
+  h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296}
+function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
+function fbm(x,y){return vn(x,y)*.5+vn(x*2.03+5.2,y*2.03+1.3)*.25+vn(x*4.01+9.1,y*4.01+3.7)*.125}
+const sm=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
+
+/* окна дома напротив */
+const WIN=[];
+for(let k=0;k<NC*NR;k++){
+  const c=k%NC,r=k/NC|0,d=Math.hypot(c-TC,(r-TR)*.6);
+  WIN.push({c,r,lit0:hash(k,1)<.68,off:k===TK?34:9+(5.3-d)*3.2,eyeT:k===TK?34.4:22+hash(k,2)*6,
+    bx:WW*(.3+.4*hash(k,3)),tv:hash(k,4)<.12,tog:hash(k,5)<.09?2+hash(k,6)*6:-1,lampX:4+hash(k,7)*14});
+}
+function lit(w,k,t){let on=w.lit0;if(w.tog>0&&t>w.tog)on=!on;if(t>=w.off)on=false;return on?1:0}
+
+/* сюжет: камера по планам */
+function cam(t){
+  if(t<22){const p=sm(0,22,t);return [180-5*p,320+10*p,1+.15*p]}
+  if(t<28){const p=(t-22)/6;return [118+10*p,226+18*p,2.6+.2*p]}
+  if(t<36){const p=sm(28,36,t);return [178,330,1.1+.2*p]}
+  if(t<40.5){const p=sm(36,40.5,t);return [174,347,8.5+2*p]}
+  return [180,320,1]
+}
+const lampOn=t=>t<41.2;
+const CAPS=[[.5,5.5,['не спится.','смотрю на дом напротив']],[15,19.5,['свет гаснет','в мою сторону']],[46,51.5,['свет в моей комнате','я не выключал']]];
+
+function windowVal(k,lu,lv,t){
+  const w=WIN[k],L=lit(w,k,t);let v;
+  if(L){
+    v=.55+.45*Math.exp(-((lu-w.lampX)**2+(lv-4)**2)/50);
+    if(lu<WW*.2||lu>WW*.8)v*=.62+.22*Math.sin(lu*2.6+fbm(lu*.2,lv*.15+k)*4);
+    if(w.tv)v*=.5+.5*hash(Math.floor(t*8),k);
+  }else v=.075+.035*fbm(lu*.3,lv*.3+k);
+  if(Math.abs(lu-WW*.56)<.6||Math.abs(lv-WH*.3)<.5)v=L?v*.35:.14;
+  const S=k===TK?Math.max(sm(31,32.5,t),sm(34,34.5,t)):sm(w.off,w.off+1.5,t);
+  if(S>0){
+    const sz=1+.3*sm(28,36,t)+(k===TK?1.2*sm(36.4,40.4,t):0);
+    const rx=WW*.2*sz,ry=WH*.42*sz,bx=k===TK?WW*.45:w.bx,by=k===TK?WH*.6:WH*.68-(sz-1)*WH*.12;
+    const n=fbm(lu*.35+t*.6,lv*.35+k*7.1+t*.3);
+    const d=((lu-bx)/rx)**2+((lv-by)/ry)**2+(n-.5)*(k===TK?1.3:.9);
+    const a=S*(1-sm(.6,1,d));v=v*(1-a)+.012*a;
+    if(t<41.2){let E=sm(w.eyeT,w.eyeT+.3,t)*S;
+      if(hash(Math.floor((t+k*.29)*1.6),k)<.08)E*=.05;
+      if(E>0){const s2=2*(.55*sz)**2,ey=by-ry*(k===TK?.24:.42);
+        for(const ex of [bx-rx*.34,bx+rx*.34])v+=E*1.9*Math.exp(-((lu-ex)**2+(lv-ey)**2)/s2)}}
+  }
+  return v;
+}
+
+function world(u,v,t){
+  /* наше окно: рама или стекло */
+  const inGlass=u>G0&&u<G1&&v>GT&&v<GB&&!(u>M0&&u<M1);
+  const lo=lampOn(t)?1:0;
+  if(!inGlass){
+    const e=Math.min(Math.abs(u-G0),Math.abs(u-G1),Math.abs(v-GT),Math.abs(v-GB),u>M0-6&&u<M1+6?Math.min(Math.abs(u-M0),Math.abs(u-M1)):99);
+    return (.22+.08*fbm(u*.1,v*.1)+(e<2?.12:0))*(.04+lo*.32*Math.exp(-Math.hypot(u-60,v-560)/170));
+  }
+  let val;
+  if(v<ROOF){
+    val=.05+.13*(v/ROOF)+.07*fbm(u*.012+t*.01,v*.035);
+    if(v>ROOF-3)val=.025;
+    if((Math.abs(u-92)<.7||Math.abs(u-261)<.7)&&v>ROOF-24)val=.03;
+  }else if(v<BASE){
+    const lu=((u-X0)%PX+PX)%PX,lv=((v-Y0)%PY+PY)%PY,c=Math.floor((u-X0)/PX),r=Math.floor((v-Y0)/PY);
+    const inW=c>=0&&c<NC&&r>=0&&r<NR&&lu<WW&&lv<WH;
+    if(inW)val=windowVal(r*NC+c,lu,lv,t);
+    else{
+      let a=.3+.15*fbm(u*.08,v*.08)+.08*(fbm(u*.3,v*.02)-.5);
+      if(Math.abs(lu-WW-9.5)<.6||Math.abs(lv-WH-7)<.5)a-=.09;
+      let L=.1+.55*Math.exp(-Math.hypot(u-LAMP_OUT[0],(v-LAMP_OUT[1])*1.2)/130);
+      if(c>=0&&c<NC&&r>=0&&r<NR){const w=WIN[r*NC+c],dd=Math.hypot(Math.max(0,lu-WW,-lu),Math.max(0,lv-WH,-lv));
+        L+=lit(w,r*NC+c,t)*.22*Math.exp(-dd/3)}
+      val=a*L;
+    }
+  }else{
+    const d=Math.hypot(u-LAMP_OUT[0],v-LAMP_OUT[1]);
+    val=.035+.04*fbm(u*.05,v*.05);
+    const tr=fbm(u*.045,v*.06)+(v-BASE)/180;
+    if(tr>.6)val=.015+.05*Math.exp(-d/40);
+    if(Math.abs(u-LAMP_OUT[0])<.8&&v>LAMP_OUT[1])val=.03;
+    val+=.9*Math.exp(-d/5)+.18*Math.exp(-d/45);
+  }
+  val=val*.86+.015*fbm(u*.06,v*.06);
+  if(lo){const d=Math.hypot(u-LAMP_IN[0],v-LAMP_IN[1]);val+=.24*Math.exp(-d/26)+.06*Math.exp(-d/120)}
+  if(t>=42.2&&t<45){const E2=sm(42.2,43.6,t);
+    const sh=((u-182)/70)**2+((v-470)/150)**2+(fbm(u*.03+t*.4,v*.03)-.5)*.8;
+    val*=1-E2*.88*(1-sm(.5,1.1,sh));
+    for(const [ex,ey] of [[166,404],[198,402]])val+=E2*1.6*Math.exp(-((u-ex)**2+(v-ey)**2)/9)}
+  return val;
+}
+
+/* вывод */
+const out=document.getElementById('c');out.width=W;out.height=H;
+const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data;
+const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
+function captions(t){
+  mc.clearRect(0,0,W,H);
+  for(const [a,z,lines] of CAPS)if(t>=a&&t<z){
+    mc.font='bold 21px "Courier New",monospace';mc.textAlign='center';mc.textBaseline='top';
+    let n=Math.floor((t-a)*20);
+    lines.forEach((l,k)=>{const s=l.slice(0,Math.max(0,n));n-=l.length;if(!s)return;
+      const w=mc.measureText(l).width+18,y=(a>40?H*.45:H*.14)+k*34;
+      mc.fillStyle='rgb(255,0,0)';mc.fillRect(W/2-w/2,y-4,w,32);
+      mc.fillStyle='rgb(0,255,0)';mc.fillText(s,W/2,y+1)});
+  }
+  return mc.getImageData(0,0,W,H).data;
+}
+function renderFrame(t){
+  const fr=Math.round(t*FPS),md=captions(t),P=sm(18,44,t),black=t>=45;
+  const pal=PAL0.map((c,i)=>c.map((v,j)=>Math.round(v+(PALS[i][j]-v)*.7*P)));
+  const bs=P>.78?3:P>.42?2:1,glitch=CUTS.some(c=>t>=c-.01&&t<c+.17);
+  const [cx,cy,z]=cam(t),jx=Math.sin(t*.7)*(.8+2.5*P)/z,jy=Math.sin(t*.53+2)*(.6+2*P)/z;
+  const nz=.06+.2*P+(glitch?.4:0);
+  let row=null;
+  for(let y=0;y<H;y++){
+    const yb=Math.floor(y/bs)*bs+(bs>>1);
+    let sh=0;
+    if(glitch&&hash(y>>3,fr)<.4)sh=(hash(y>>4,fr+3)-.5)*80;
+    else if(hash(y>>2,fr*5)<.003+.02*P)sh=(hash(y,fr)-.5)*(10+40*P);
+    const by=(y&3)*4;
+    for(let x=0;x<W;x++){
+      const o=(y*W+x)*4;let g;
+      if(black)g=0;
+      else{
+        if(bs===1||x%bs===0||y%bs===0||!row){
+          const xb=Math.floor(x/bs)*bs+(bs>>1);
+          g=Math.pow(Math.max(0,world(cx+(xb-180+sh)/z+jx,cy+(yb-320)/z+jy,t)),.5);
+        }
+        g=bs>1&&row&&!(x%bs===0||y%bs===0)?row[x]:g;
+      }
+      if(bs>1){if(!row)row=new Float32Array(W);if(y%bs===0)row[x]=g;else g=row[x]}
+      g+=(hash(y*W+x,fr*7+1)-.5)*nz*(black?.3:1);
+      const nx=(x-180)/180,ny=(y-320)/320;g*=1-.16*(nx*nx+ny*ny);
+      let l=Math.floor(g*5+BAY[by+(x&3)]);l=l<0?0:l>5?5:l;
+      if(md[o+1]>127)l=5;else if(md[o]>127)l=0;
+      const c=pal[l];px[o]=c[0];px[o+1]=c[1];px[o+2]=c[2];px[o+3]=255;
+    }
+  }
+  oc.putImageData(img,0,0);
+}
+
+/* звук */
+function buildAudio(ac,out,T0){
+  const sr=ac.sampleRate,M=ac.createGain();M.gain.value=.9;M.connect(out);
+  const nb=ac.createBuffer(1,sr*4,sr),nd=nb.getChannelData(0),bb=ac.createBuffer(1,sr*4,sr),bd=bb.getChannelData(0);let l=0;
+  for(let i=0;i<nd.length;i++){nd[i]=hash(i,77)*2-1;l=(l+.02*(hash(i,78)*2-1))/1.02;bd[i]=l*3.5}
+  const src=(b,loop)=>{const s=ac.createBufferSource();s.buffer=b;s.loop=!!loop;return s};
+  const filt=(ty,f,q)=>{const b=ac.createBiquadFilter();b.type=ty;b.frequency.value=f;b.Q.value=q;return b};
+  const pan=p=>{const n=ac.createStereoPanner();n.pan.value=p;n.connect(M);return n};
+  const A=x=>T0+x;
+  function burst(t,d,f,q,g,ty,p){const s=src(nb),gg=ac.createGain();
+    gg.gain.setValueAtTime(g,A(t));gg.gain.exponentialRampToValueAtTime(.0005,A(t+d));
+    s.connect(filt(ty||'bandpass',f,q)).connect(gg).connect(pan(p||0));s.start(A(t),(t*1.37)%3);s.stop(A(t+d+.03))}
+  function tone(t,d,f,g,ty,f2,p){const o=ac.createOscillator(),gg=ac.createGain();o.type=ty||'sine';
+    o.frequency.setValueAtTime(f,A(t));if(f2)o.frequency.exponentialRampToValueAtTime(f2,A(t+d));
+    gg.gain.setValueAtTime(.0005,A(t));gg.gain.exponentialRampToValueAtTime(g,A(t+.008));gg.gain.exponentialRampToValueAtTime(.0005,A(t+d));
+    o.connect(gg).connect(pan(p||0));o.start(A(t));o.stop(A(t+d+.03))}
+  function bed(node,pts,stop){const gg=ac.createGain();gg.gain.setValueAtTime(0,T0);
+    for(const [t,g,hard] of pts){if(hard)gg.gain.setValueAtTime(g,A(t));else gg.gain.linearRampToValueAtTime(g,A(t))}
+    node.connect(gg).connect(M);return gg}
+  const city=src(bb,true);bed(city.connect(filt('lowpass',520,.7)),[[0,.3,1],[33.95,.3,1],[34.02,0],[40.5,0,1],[40.6,.12],[44.95,.12,1],[45,0]]);city.start(T0);city.stop(A(DUR));
+  const traf=src(nb,true),tg=bed(traf.connect(filt('bandpass',300,1.2)),[[0,0,1]]);
+  for(let t=1;t<33;t+=6.5){tg.gain.linearRampToValueAtTime(0,A(t));tg.gain.linearRampToValueAtTime(.06,A(t+2.5));tg.gain.linearRampToValueAtTime(0,A(t+5.5))}
+  traf.start(T0);traf.stop(A(34));
+  WIN.forEach((w,k)=>{if(k===TK)return;if(!(w.lit0!==(w.tog>0&&w.tog<w.off)))return;
+    burst(w.off,.025,2000,2,.03+.24*sm(9,26,w.off),'bandpass',(w.c-TC)/3.5)});
+  [43.65,44.1,65.4].forEach(f=>{const o=ac.createOscillator();o.frequency.value=f;
+    bed(o.connect(filt('lowpass',300,.7)),[[16,0,1],[33.9,.11],[33.95,.11,1],[34,0]]);o.start(A(16));o.stop(A(34.1))});
+  {const o=ac.createOscillator();o.frequency.value=5200;bed(o,[[31,0,1],[33.95,.022],[34,0]]);o.start(A(31));o.stop(A(34.1))}
+  for(const c of CUTS.slice(0,4)){burst(c,.2,3000,.4,.45,'highpass');tone(c,.3,90,.6,'sine',35)}
+  burst(34,.03,2600,2,.6);tone(34,.12,120,.4,'sine',60);
+  {const o=ac.createOscillator();o.frequency.value=31;bed(o,[[36,0,1],[40.4,.35],[40.5,0,1]]);o.start(A(36));o.stop(A(40.6))}
+  {const o=ac.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(320,A(37));o.frequency.linearRampToValueAtTime(230,A(40.4));
+    bed(o.connect(filt('bandpass',1800,12)),[[37,0,1],[39,.05],[40.4,.08],[40.5,0,1]]);o.start(A(37));o.stop(A(40.6))}
+  burst(41.2,.04,2500,2,.9);tone(41.2,.12,140,.5,'sine',60);
+  {const s=src(nb,true),gg=bed(s.connect(filt('bandpass',700,.9)),[[42.4,0,1]]);
+    for(let t=42.4;t+2.2<45;t+=2.3){gg.gain.linearRampToValueAtTime(.35,A(t+.8));gg.gain.linearRampToValueAtTime(0,A(t+1));
+      gg.gain.linearRampToValueAtTime(.5,A(t+1.3));gg.gain.linearRampToValueAtTime(0,A(t+2.2))}
+    gg.gain.setValueAtTime(0,A(44.98));s.start(A(42.4));s.stop(A(45))}
+}
+async function audioWav(){
+  const sr=44100,ctx=new OfflineAudioContext(2,sr*DUR,sr);buildAudio(ctx,ctx.destination,0);
+  const ab=await ctx.startRendering(),L=ab.getChannelData(0),R=ab.getChannelData(1),n=L.length;
+  const buf=new ArrayBuffer(44+n*4),dv=new DataView(buf),ws=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF');dv.setUint32(4,36+n*4,true);ws(8,'WAVEfmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);
+  dv.setUint16(22,2,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*4,true);dv.setUint16(32,4,true);dv.setUint16(34,16,true);
+  ws(36,'data');dv.setUint32(40,n*4,true);
+  for(let i=0;i<n;i++){dv.setInt16(44+i*4,Math.max(-1,Math.min(1,L[i]))*32767,true);dv.setInt16(46+i*4,Math.max(-1,Math.min(1,R[i]))*32767,true)}
+  const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));
+  return btoa(s);
+}
+window.renderFrame=renderFrame;window.audioWav=audioWav;window.DUR=DUR;window.FPS=FPS;
+
+/* живой показ */
+const gate=document.getElementById('gate');let ac=null,T0=0,st=0,lastFr=-1,run=false;
+function loop(now){
+  if(!run)return;requestAnimationFrame(loop);
+  const t=ac?ac.currentTime-T0:(now-st)/1000;
+  if(t>DUR){run=false;document.getElementById('gl').textContent='[ смотреть ещё раз ]';gate.hidden=false;return}
+  const fr=Math.floor(Math.max(0,t)*FPS);if(fr!==lastFr){lastFr=fr;renderFrame(fr/FPS)}
+}
+gate.addEventListener('click',()=>{
+  try{if(ac)ac.close();ac=new (window.AudioContext||window.webkitAudioContext)();T0=ac.currentTime+.1;buildAudio(ac,ac.destination,T0)}catch(e){ac=null}
+  st=performance.now();lastFr=-1;gate.hidden=true;run=true;requestAnimationFrame(loop);
+});
+renderFrame(0);gate.focus();
+})();
+</script>
+</body>
+</html>
