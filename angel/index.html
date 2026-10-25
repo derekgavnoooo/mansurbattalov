@@ -120,7 +120,7 @@ function pushRings(items,t,cx,cy,S,L,E,F,fr,ks,aw,look,ov,eyeMul){
       items.push([z-.01,1,sx,sy,(8.5+4.5*hash(idx,4))*f*S*(eyeMul||1),o,idx,(.75+.25*(1-z))*L,look])}});
 }
 function drawItems(items,t,E){
-  items.sort((a,b)=>b[0]-a[0]);
+  items.sort((a,b)=>(a[1]-b[1])||(b[0]-a[0]));
   for(const it of items){
     if(it[1]===0){const [,,sx,sy,r,c]=it,R=Math.ceil(r+1);
       for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const X=Math.round(sx)+i,Y=Math.round(sy)+j;if(X<0||X>=W||Y<0||Y>=H)continue;
@@ -144,70 +144,83 @@ function feather(x,y,fx,fy,sc,ang,seed){
   if(u<0||u>l||Math.abs(v)>w-1.2*Math.max(0,Math.sin(u*1.7+seed))*(u>l*.5?1:.3))return -1;
   return .5+.25*Math.sin(u*1.4+Math.abs(v)*1.1+seed)*.5-.2*Math.abs(v)/w+.1*fbm(u*.5,v*.5+seed);
 }
-/* ---------- scenes ---------- */
-const CUTS=[9,18,27.2,38,51.5,63,71];
-const EYECUTS=[27.2,28.6,30,31.3,32.7,34.1,35.5,36.8,38];
-function scene(t,fr,E,F){
-  const L=life(t);let items=[];
-  if(t<9){/* clouds ascent */
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-      let v=(.2+.3*Math.pow(1-y/H,1.3))*L+.6*L*Math.exp(-Math.hypot(x-90,y+30)/(120+t*14));
-      for(let k=0;k<3;k++){const sp=22+k*34,n=fbm(x*.011*(k+1)+k*7,(y+t*sp)*.012*(k+1)+k*3),dn=sm(.45,.72,n);
-        const sh=fbm(x*.011*(k+1)+k*7,(y-6+t*sp)*.012*(k+1)+k*3)-n,col=(.78-.14*k)*L+.3*L*Math.exp(-Math.hypot(x-90,y)/220)-.9*Math.max(0,-sh)*L;v=v*(1-dn*.9)+col*dn*.9}
-      v+=sm(8.3,9,t)*.9;B[y*W+x]=v}
-    return items}
-  if(t<18){/* one ring, very close */
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,L*.8,-30,230,1)+.22*L*Math.exp(-Math.hypot(x-40,y-260)/150);
-    pushRings(items,t,-30,235,3.6,L,E,F,fr,[0],sm(10,16.5,t),0,{0:{a:.32+.05*Math.sin(t*.3),b:.2,sp:.09,ne:34}},.5);
-    drawItems(items,t,E);return items}
-  if(t<27.2){/* wide reveal over a cloud sea */
-    const cx=90,cy=118,S=.6,unf=sm(19,25.5,t);
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L,cx,cy,S);
-      const w=unf>0?wings(x,y,t,cx,cy,S,unf,L,E):-1;if(w>v)v=w;v+=core(x,y,cx,cy,S,L,E);
-      const c=cloudSea(x,y,t,232,L,1);if(c>=0)v=c;B[y*W+x]=v}
-    pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],sm(21,26.5,t),0);
-    const top=232;drawItems(items,t,E);
-    for(let y=top-12;y<H;y++)for(let x=0;x<W;x++){const c=cloudSea(x,y,t,top,L,1);if(c>=0)B[y*W+x]=c}
-    return items}
-  if(t<38){/* eye close-ups, quick cuts */
-    let i=0;while(i<EYECUTS.length-2&&t>=EYECUTS[i+1])i++;
-    const t0=EYECUTS[i],lt=t-t0,ang=(hash(i,1)-.5)*1.6,R=48+30*hash(i,2),ex=90+(hash(i,3)-.5)*30,ey=160+(hash(i,4)-.5)*60;
-    const ca=Math.cos(ang),sa=Math.sin(ang);
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-      const bx=(x-ex)*ca+(y-ey)*sa,by=-(x-ex)*sa+(y-ey)*ca;let v=haze(x,y,t,L*.55,ex,ey,2);
-      const bw=R*1.35*(1+.15*(fbm(bx*.02+i,1)-.5));
-      if(Math.abs(by)<bw){const fl=fbm(bx*.05+i*9+t*.3,by*.06+t*1.4),edge=sm(bw,bw*.75,Math.abs(by));v=v*(1-edge)+(.38+.5*fl)*L*edge}
-      B[y*W+x]=v}
-    for(const s of [-1,1]){const ox=ex+s*R*2.3*ca,oy=ey+s*R*2.3*sa;bigEye(ox,oy,R*.45,sm(t0+.3,t0+.8,t),.2*Math.sin(t+i),0,i*7+s,t,E)}
-    const o=sm(t0+.05,t0+.55,t)*(hash(fr>>1,i)<.05?.1:1),stare=sm(t0+.9,t0+1.1,t);
-    bigEye(ex,ey,R,o,.35*Math.sin(lt*3+i)*(1-stare),.18*Math.cos(lt*2.3+i)*(1-stare),i*3.1+.5,t,E);
-    return items}
-  if(t<51.5){/* falling feathers, the angel far above */
-    const cx=90,cy=46,S=.22;
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L*.6,cx,cy,S)+.08*L*(1-y/H);
-      const w=wings(x,y,t,cx,cy,S,1,L*.8,E);if(w>v)v=w;v+=core(x,y,cx,cy,S,L,E);B[y*W+x]=v}
-    pushRings(items,t,cx,cy,S,L*.85,E,F,fr,[0,1,2],.55+.15*Math.sin(t*.4),0);drawItems(items,t,E);
-    for(let k=0;k<22;k++){const sc=.35+1.6*hash(k,1)**2,sp=6+9*sc,fy=((hash(k,2)*420+(t-38)*sp)%420)-50,fx=hash(k,3)*W+14*Math.sin(t*.5+k*2)*sc;
-      const ang=1.2+.9*Math.sin(t*.6+k)+hash(k,4)*3,x0=Math.max(0,(fx-22*sc)|0),x1=Math.min(W-1,(fx+22*sc)|0),y0=Math.max(0,(fy-22*sc)|0),y1=Math.min(H-1,(fy+22*sc)|0);
-      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const f=feather(x,y,fx,fy,sc,ang,k);if(f>=0)B[y*W+x]=f*L*(.5+.35*Math.min(1,sc))+.05}}
-    return items}
-  if(t<63){/* flying into the angel */
-    const cx=90,cy=150,S=.62*Math.exp(.165*(t-51.5));
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L,cx,cy,S);const w=wings(x,y,t,cx,cy,S,1,L,E);if(w>v)v=w;v+=core(x,y,cx,cy,S,L,E);B[y*W+x]=v}
-    pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],1,sm(58,60,t));drawItems(items,t,E);return items}
-  if(t<71){/* the central eye */
-    const cx=90,cy=158;
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,L,cx,cy,3)+core(x,y,cx,cy,2.2,L,E)*.6;
-    pushRings(items,t,cx,cy,2.15,L,E,F,fr,[0,1,2],1,1,null,.6);drawItems(items,t,E);
-    bigEye(cx,cy,62+5*E,sm(63.3,65,t),.0,0,99,t,1);return items}
-  /* pulling away into the clouds */
-  const S=1.5*Math.exp(-.3*(t-71)),cx=90,cy=150-30*sm(71,80,t),unf=1-.4*sm(74,82,t),top=H+10-(H-120)*sm(72,83,t);
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L,cx,cy,S);const w=wings(x,y,t,cx,cy,S,unf,L,E);if(w>v)v=w;v+=core(x,y,cx,cy,S,L,E);B[y*W+x]=v}
-  pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],1-sm(72,80,t),0);drawItems(items,t,E);
-  for(let y=Math.max(0,(top-12)|0);y<H;y++)for(let x=0;x<W;x++){const c=cloudSea(x,y,t,top,L,.6);if(c>=0)B[y*W+x]=c}
-  return items;
+/* ---------- short scenes, 2.5–5 s each ---------- */
+const SH=[[0,'eye',{i:0,R:70,hook:1}],[3,'swarm',{seed:1}],[6.5,'ring',{cx:-30,cy:235,S:3.6,a:.32,b:.2}],[10.5,'wide',{cy:118,S:.6,sea:1,unf:1}],
+ [14.5,'eye',{i:1,R:55}],[17.5,'ring',{cx:215,cy:300,S:2.7,a:.7,b:-.5}],[21,'fly',{s0:.8,k:.28}],[25,'eye',{i:2,R:62}],[27.5,'ring',{cx:190,cy:80,S:2.4,a:.9,b:.6}],
+ [31,'swarm',{seed:2,stare:1}],[34,'wide',{cy:150,S:.85,unf:1}],[38,'feathers',{}],[42.5,'clouds',{}],[47,'ring',{cx:90,cy:420,S:3.4,a:.1,b:1.4}],
+ [51.5,'fly',{s0:.6,k:.42}],[55,'eye',{i:3,R:75}],[58,'swarm',{seed:3,stare:1}],[61,'wide',{cy:135,S:.75,unf:1}],[63.5,'core',{}],
+ [68,'ringcore',{}],[71,'away',{}],[76,'feathers',{dark:1}],[80,'last',{}]];
+const CUTS=SH.slice(1).map(s=>s[0]);
+function burn(x,y,t,L,seed){const fl=fbm(x*.045+seed*9+t*.25,y*.05+t*1.3),f2=fbm(x*.11+seed,y*.12+t*2);return (.28+.45*fl+.15*f2)*L}
+function sEye(t,lt,p,L,E,fr){
+  const i=p.i,ang=(hash(i,1)-.5)*1.6,R=p.R,ex=90+(hash(i,3)-.5)*24,ey=160+(hash(i,4)-.5)*50,ca=Math.cos(ang),sa=Math.sin(ang);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const bx=(x-ex)*ca+(y-ey)*sa,by=-(x-ex)*sa+(y-ey)*ca;let v=haze(x,y,t,L*.55,ex,ey,2);
+    const bw=R*1.35*(1+.15*(fbm(bx*.02+i,1)-.5));
+    if(Math.abs(by)<bw){const e=sm(bw,bw*.75,Math.abs(by));v=v*(1-e)+burn(bx,by,t,L,i)*e}
+    B[y*W+x]=v}
+  for(const s of [-1,1])bigEye(ex+s*R*2.3*ca,ey+s*R*2.3*sa,R*.45,sm(.3,.8,lt),.2*Math.sin(t+i),0,i*7+s,t,E);
+  const o=p.hook?sm(.15,.35,lt):sm(.05,.55,lt),st=sm(.9,1.1,lt);
+  bigEye(ex,ey,R,o*(hash(fr>>1,i)<.04&&lt>1.2?.1:1),.35*Math.sin(lt*3+i)*(1-st),.18*Math.cos(lt*2.3+i)*(1-st),i*3.1+.5,t,E);
 }
-const CAPS=[[63.5,70.5,'BE NOT AFRAID']];
+function sSwarm(t,lt,p,L,E,fr){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=burn(x,y,t,L*.85,p.seed)*.8;
+  const C=34;
+  for(let gy=-1;gy<H/C+1;gy++)for(let gx=-1;gx<W/C+1;gx++){
+    const h=hash(gx+p.seed*50,gy);if(h<.12)continue;
+    const cx=(gx+.5)*C+(hash(gx,gy+p.seed)-.5)*16,cy=(gy+.5)*C+(hash(gx+3,gy)-.5)*16,r=7+11*hash(gx+7,gy+p.seed),d=Math.hypot(cx-90,cy-160);
+    let o=sm(d/180,d/180+.35,lt);if(hash(fr>>1,gx*31+gy)<.05)o*=.1;
+    const st=p.stare?sm(1.2,1.5,lt):0;
+    bigEye(cx,cy,r,o,.3*Math.sin(t*.8+gx)*(1-st),.15*Math.cos(t*.7+gy)*(1-st),gx*13+gy*7+p.seed,t,E)}
+}
+function sRing(t,lt,p,L,E,F,fr){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,L*.8,p.cx,p.cy,1)+.22*L*Math.exp(-Math.hypot(x-90,y-160)/170);
+  const items=[];pushRings(items,t,p.cx,p.cy,p.S,L,E,F,fr,[0],sm(.1,2.2,lt),0,{0:{a:p.a+.05*Math.sin(t*.3),b:p.b,sp:.12,ne:34}},.5);drawItems(items,t,E);
+}
+function sAngel(t,cx,cy,S,unf,L,E,F,fr,aw,look,sea){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L,cx,cy,S);
+    const w=unf>0?wings(x,y,t,cx,cy,S,unf,L,E):-1;if(w>v)v=w;v+=core(x,y,cx,cy,S,L,E);B[y*W+x]=v}
+  const items=[];pushRings(items,t,cx,cy,S,L,E,F,fr,[0,1,2],aw,look);drawItems(items,t,E);
+  if(sea!==undefined)for(let y=Math.max(0,(sea-12)|0);y<H;y++)for(let x=0;x<W;x++){const c=cloudSea(x,y,t,sea,L,1);if(c>=0)B[y*W+x]=c}
+}
+function sFeathers(t,lt,p,L,E,F,fr){
+  const k0=p.dark?.5:1;sAngel(t,90,46,.22,1,L*.75*k0,E,F,fr,.55+.15*Math.sin(t*.4),0);
+  for(let k=0;k<22;k++){const sc=.35+1.6*hash(k,1)**2,sp=6+9*sc,fy=((hash(k,2)*420+(t-38)*sp)%420)-50,fx=hash(k,3)*W+14*Math.sin(t*.5+k*2)*sc;
+    const ang=1.2+.9*Math.sin(t*.6+k)+hash(k,4)*3,x0=Math.max(0,(fx-22*sc)|0),x1=Math.min(W-1,(fx+22*sc)|0),y0=Math.max(0,(fy-22*sc)|0),y1=Math.min(H-1,(fy+22*sc)|0);
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const f=feather(x,y,fx,fy,sc,ang,k);if(f>=0)B[y*W+x]=(f*(.5+.35*Math.min(1,sc))+.05)*L*k0}}
+}
+function sClouds(t,lt,L){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let v=(.2+.3*Math.pow(1-y/H,1.3))*L+.6*L*Math.exp(-Math.hypot(x-90,y+30)/150);
+    for(let k=0;k<3;k++){const sp=22+k*34,n=fbm(x*.011*(k+1)+k*7,(y+t*sp)*.012*(k+1)+k*3),dn=sm(.45,.72,n);
+      const sh=fbm(x*.011*(k+1)+k*7,(y-6+t*sp)*.012*(k+1)+k*3)-n,col=(.78-.14*k)*L+.3*L*Math.exp(-Math.hypot(x-90,y)/220)-.9*Math.max(0,-sh)*L;v=v*(1-dn*.9)+col*dn*.9}
+    B[y*W+x]=v}
+  const ax=90+30*Math.sin(t*.3),ay=-10+lt*14;const items=[];pushRings(items,t,ax,ay,.35,L*.9,E0,0,0,[0,1,2],.6,0);drawItems(items,t,E0);
+}
+let E0=0;
+function sceneRun(t,fr,E,F){
+  const L=1-.85*sm(74,84,t);E0=E;
+  let i=0;while(i<SH.length-1&&t>=SH[i+1][0])i++;
+  const [t0,type,p]=SH[i],lt=t-t0;
+  if(type==='eye')sEye(t,lt,p,L,E,fr);
+  else if(type==='swarm')sSwarm(t,lt,p,L,E,fr);
+  else if(type==='ring')sRing(t,lt,p,L,E,F,fr);
+  else if(type==='wide')sAngel(t,90,p.cy,p.S,p.unf,L,E,F,fr,1,0,p.sea?232:undefined);
+  else if(type==='wing'){for(let y=0;y<H;y++)for(let x=0;x<W;x++){let v=haze(x,y,t,L*.7,90,160,1);const w=wings(x,y,t+lt*.4,p.cx+lt*12,p.cy-lt*8,p.S,1,L,E);if(w>v)v=w;B[y*W+x]=v}}
+  else if(type==='fly')sAngel(t,90,150,p.s0*Math.exp(p.k*lt),1,L,E,F,fr,1,sm(1.5,2.2,lt));
+  else if(type==='feathers')sFeathers(t,lt,p,L,E,F,fr);
+  else if(type==='clouds')sClouds(t,lt,L);
+  else if(type==='core'||type==='ringcore'){
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,L,90,158,3)+core(x,y,90,158,2.2,L,E)*.6;
+    const items=[];pushRings(items,t*(type==='ringcore'?2.2:1),90,158,type==='ringcore'?1.3:2.15,L,E,F,fr,[0,1,2],1,1,null,.6);drawItems(items,t,E);
+    bigEye(90,158,(type==='ringcore'?44:62)+5*E,type==='core'?sm(.2,1.6,lt):1,0,0,99,t,1)}
+  else if(type==='away'){const S=1.5*Math.exp(-.45*lt),top=H+10-(H-130)*sm(0,5,lt);
+    sAngel(t,90,150-25*sm(0,5,lt),S,1-.4*sm(2,5,lt),L,E,F,fr,1-sm(1,4.5,lt),0,top)}
+  else{/* last eye closes in the dark */
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)B[y*W+x]=haze(x,y,t,.18,90,160,1);
+    bigEye(90,160,58,1-sm(1.5,4.6,lt),0,0,99,t,.3)}
+}
+const CAPS=[[64,68,'BE NOT AFRAID']];
 function text(t,fr){
   mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';mc.font='bold 14px "Courier New",monospace';
   for(const [a,z,s] of CAPS)if(t>=a&&t<z&&hash(fr,5)>.1){const ox=(hash(fr,9)-.5)*1.4,oy=(hash(fr,19)-.5)*1.4;
@@ -216,7 +229,7 @@ function text(t,fr){
 }
 function renderFrame(t){
   const fr=Math.round(t*FPS),md=text(t,fr),E=Es(t),F=mus(EN_F,t);
-  scene(t,fr,E,F);
+  sceneRun(t,fr,E,F);
   const flash=CUTS.some(c=>t>=c&&t<c+.17)?.35:0,tr=CUTS.some(c=>Math.abs(t-c)<.1);
   for(let y=0;y<H;y++){const by=(y&3)*4;for(let x=0;x<W;x++){
     const i=y*W+x,o=i*4;let v=Math.pow(Math.max(0,B[tr&&hash(y>>2,fr)<.4?y*W+Math.min(W-1,Math.max(0,x+(((hash(y>>3,fr+3)-.5)*30)|0))):i]),.9)+flash;
