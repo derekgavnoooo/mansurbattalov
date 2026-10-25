@@ -141,7 +141,10 @@ function layer(n,x,y,t,hb,lvl,hh){
 const out=document.getElementById('c');out.width=W;out.height=H;
 const oc=out.getContext('2d',{alpha:false}),img=oc.createImageData(W,H),px=img.data;
 const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mc=mask.getContext('2d',{willReadFrequently:true});
-const MSG=[[5,7.5,'не моргай'],[12,14.5,'глубже'],[19.5,22,'оно видит тебя изнутри'],[26.5,28.5,'ты уже внутри'],
+const EN=window.LANG==='en'||location.hash==='#en';
+const MSG=EN?[[5,7.5,"don't blink"],[12,14.5,'deeper'],[19.5,22,'it sees you from inside'],[26.5,28.5,"you're already inside"],
+  [31,33,'deeper still'],[35.5,38.3,"IT'S WATCHING|YOUR SCREEN TOO"],[40.2,43.5,'now blink']]
+ :[[5,7.5,'не моргай'],[12,14.5,'глубже'],[19.5,22,'оно видит тебя изнутри'],[26.5,28.5,'ты уже внутри'],
   [31,33,'ещё глубже'],[35.5,38.3,'ОНО ТОЖЕ|СМОТРИТ В ЭКРАН'],[40.2,43.5,'теперь моргни']];
 const CROSS=[11,18,24.5,30,34];
 const tear=(fr)=>hash(fr,31)<.02+.12*tension(fr/FPS)||CROSS.some(c=>Math.abs(fr/FPS-c)<.13);
