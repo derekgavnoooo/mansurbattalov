@@ -6,9 +6,9 @@
 <title>Зрачок</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* вертикальный кадр 9:16: бесконечный наезд в зрачок; 5 тонов засохшей крови, дизер 4×4 */
+/* вертикальный кадр 9:16: бесконечный наезд в зрачок; 180×320 точек, 4 тона засохшей крови, дизер 4×4 */
 :root{
-  --void:#040202; --scab:#260406; --meat:#600c0e; --raw:#a83a30; --bone:#e6d8c0;
+  --void:#040202; --scab:#340506; --meat:#841012; --raw:#a83a30; --bone:#e2d6be;
   --mono:"Courier New",Courier,monospace;
   color-scheme:dark;
 }
@@ -32,8 +32,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;image-re
 </button>
 <script>
 (()=>{
-const W=360,H=640,DUR=43,FPS=12,K=16,S0=13,TAU=Math.PI*2;
-const PAL=[[4,2,2],[38,4,6],[96,12,14],[168,58,48],[230,216,192]];
+const W=180,H=320,DUR=43,FPS=12,K=20,S0=13,TAU=Math.PI*2;
+const PAL=[[4,2,2],[52,5,6],[132,16,18],[226,214,190]];
 const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
 function hash(x,y){let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0;
   h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296}
@@ -64,77 +64,77 @@ function centerOpen(n,t){
 }
 const stare=t=>(t>=19.5&&t<22)||t>=35;
 
-function miniEye(v,dx,dy,r,open,lx,ly,seed){
-  const ax=Math.abs(dx);if(ax>=r*1.35)return v;
-  const half=ax<r?.55*r*open*Math.pow(1-(dx/r)**2,.8):0,ay=Math.abs(dy);
-  if(ay<half){
-    const ix=dx/r-lx,iy=dy/r-ly,ir=Math.hypot(ix,iy);let e;
-    if(ir<.2)e=0;else if(ir<.45)e=ir>.41?.06:.22+.3*vn(Math.atan2(iy,ix)*5+seed,ir*12);
-    else e=.94-Math.max(0,ax/r-.65)*1.1;
-    e-=Math.max(0,1-(half-ay)/(half*.4+.01))*(dy<0?.45:.2);
-    if((ix+.14)**2+(iy+.14)**2<.008)e=1;
-    return e;
+function fbm5(x,y){return fbm(x,y)*.8+vn(x*8.1+2.3,y*8.1+7.7)*.07+vn(x*16.3+1.1,y*16.3+4.4)*.035}
+
+/* органический глаз: края век, радужка и зрачок плывут от шума, обводок нет */
+function eye(v,x,y,R,open,lx,ly,seed,t,n,center,hb,lvl,hh){
+  const dx=x/R,dy=y/R,ax=Math.abs(dx);
+  if(ax>1.5||Math.abs(dy)>1.25)return v;
+  const sh=ax<1?Math.pow(1-dx*dx,.8):0;
+  const nt=fbm(dx*2.2+seed,t*.25+seed*.3),nb=fbm(dx*2.2+seed+9,t*.2);
+  const tilt=(fbm(seed,t*.1)-.5)*.08;
+  const top=-(.58*open*sh)*(.8+.4*nt)+tilt*dx,bot=(.42*open*sh)*(.8+.4*nb)+tilt*dx;
+  const dTop=dy-top,dBot=bot-dy,inside=Math.min(dTop,dBot);
+  if(inside<=0){
+    if(ax<1.3){const out=-inside;
+      const fold=dy<0?Math.abs(out-.17-.06*nt):Math.abs(out-.13-.05*nb);
+      v-=Math.exp(-fold*fold/.0018)*(1-ax*.6)*.22;
+      if(ax<1)v-=Math.exp(-out*out/.0015)*.3}
+    return v;
   }
-  const ring=Math.hypot(dx/r,dy/r*1.8);
-  if(ring<1.35){const k=1-ring/1.35,wr=Math.sin(dy/r*20+dx/r*3+seed)*.5+.5;v=v*(1-k*.55)+k*.36*wr;
-    if(ax<r&&ay-half<.07*r)v-=.5}
-  return v;
+  const ix=dx-lx,iy=dy-ly,ir=Math.hypot(ix,iy),ang=Math.atan2(iy,ix);
+  const Rir=.43*(1+.1*(fbm(ang*1.3+seed,seed+t*.05)-.5));
+  const Rp=(center?1/6:.17*(1+.15*hb))*(.96+.12*(fbm(ang*1.7+seed*2,t*.3)-.5));
+  const w=fbm(x*.9+seed,y*.9),vv=fbm5(x*1.1+w*1.5+seed,y*1.1-w*1.5);
+  const vein=Math.max(0,1-Math.abs(vv-.5)*10)*(.45+.6*ax);
+  const s=.88+.14*fbm(x*.5+seed,y*.5)-vein*.5-ax*ax*.28;
+  const q=fbm5(ang*5+fbm(ir*9+seed,ang*2)*1.8+seed,ir*12+seed);
+  const iv=(.08+.34*q)*(.5+.5*sm(Rir,Rir*.7,ir)),ib=sm(Rir*1.07,Rir*.9,ir);
+  let e=s*(1-ib)+iv*ib;
+  if(center&&n===4&&ir>Rp*1.35&&ir<Rir*.95){
+    const ring=Math.floor((ir-Rp*1.35)/.07),cnt=18+ring*6,qa=(ang+Math.PI)/TAU*cnt,qi=Math.floor(qa);
+    const cr=Rp*1.35+(ring+.5)*.07,ca=(qi+.5+(hash(qi,ring)-.5)*.4)/cnt*TAU-Math.PI;
+    const d=Math.hypot(ix-Math.cos(ca)*cr,iy-Math.sin(ca)*cr);
+    if(hash(Math.floor(t*1.4+hash(qi,ring+5)*3),qi+ring*50)>.15)e=e*sm(.012,.026,d)+.02*(1-sm(.012,.026,d));
+  }
+  const pb=sm(Rp*1.12,Rp*.9,ir);
+  if(pb>0){let pv=.015;
+    if(center&&lvl<1){const rev=sm(15,100,160/hh);if(rev>0)pv=pv*(1-rev)+rev*layer(n+1,x*K,y*K,t,hb,lvl+1,hh*K)}
+    if(center&&n===5&&lvl===0){const rr=Math.pow(Math.pow(Math.abs(x+.1)/.28,6)+Math.pow(Math.abs(y+.1)/.45,6),1/6);
+      pv=Math.max(pv,.62*sm(1.2,.8,rr)*(.8+.2*fbm(x*9,y*9)))}
+    e=e*(1-pb)+pv*pb}
+  e*=.4+.6*sm(0,.2,dTop);e*=.55+.45*sm(0,.12,dBot);
+  const wet=fbm(x*2.4/R*6+t*.15+seed,y*2.4/R*6);
+  if(wet>.7)e+=(wet-.7)*3*sm(.02,.12,dTop)*(dy<.05?1:.4)*(1-pb*.85);
+  const edge=sm(0,.04,inside);
+  return v*(1-edge)+e*edge;
 }
 
 function layer(n,x,y,t,hb,lvl,hh){
-  /* плоть */
   const s=.2,sd=n*17.3,b=1-hb*.03;x*=b;y*=b;
   const wx=fbm(x*s+sd+t*.05,y*s)*3,wy=fbm(x*s+11.3,y*s+sd-t*.04)*3;
-  const f=fbm(x*s*1.3+wx,y*s*1.3+wy+sd),nn=fbm(x*.4+wy*.6+sd,y*.4-wx*.6);
+  const f=fbm5(x*s*1.3+wx,y*s*1.3+wy+sd),nn=fbm(x*.4+wy*.6+sd,y*.4-wx*.6);
   const vein=Math.max(0,1-Math.abs(nn-.5)*(n===3?13:24));
-  let v=f*1.25-.22-vein*(n===3?.6:.45)+hb*.1;
+  let v=f*1.3-.2-vein*(n===3?.55:.42)+hb*.1;
   if(n>=4)v*=.72;
-  /* мелкие глаза вокруг */
   const dens=[0,.55,.35,.95,.6,.75][Math.min(n,5)];
-  if(dens>0){const C=4.2,ci=Math.floor(x/C),cj=Math.floor(y/C),h1=hash(ci+n*999,cj);
-    if(h1<dens){const ex=(ci+.25+.5*hash(ci,cj+7))*C,ey=(cj+.25+.5*hash(ci+3,cj))*C,r=.8+1.1*hash(ci+5,cj+5);
+  if(dens>0){const C=5.5,ci=Math.floor(x/C),cj=Math.floor(y/C),h1=hash(ci+n*999,cj);
+    if(h1<dens){const ex=(ci+.4+.2*hash(ci,cj+7))*C,ey=(cj+.4+.2*hash(ci+3,cj))*C,r=.85+.6*hash(ci+5,cj+5);
       if((ex/9)**2+(ey/7)**2>1.15){
-        let o=1;if(hash(Math.floor(t*1.3+h1*9),ci*7+cj)<.1)o=.08;
+        let o=.55+.45*hash(ci+1,cj+2);if(hash(Math.floor(t*1.3+h1*9),ci*7+cj)<.1)o=.05;
         if(n===5&&t>=38.3)o*=1-sm(38.3,38.6,t);
         let lx=0,ly=0;
-        if(!stare(t)){const l=Math.hypot(ex,ey)||1;lx=-ex/l*.32+Math.sin(t*.8+h1*20)*.05;ly=-ey/l*.25}
-        v=miniEye(v,x-ex,y-ey,r,o,lx,ly,h1*50)}}}
-  /* рот из зубов вокруг главного глаза */
-  if(n===2){const e=Math.hypot(x/7.1,y/5.4);
-    if(e>.6&&e<1.08){const th=Math.atan2(y,x),q=(th+Math.PI)/TAU*30,k=Math.floor(q),u=q-k;
-      const tp=Math.sqrt(Math.max(0,1-Math.abs(u-.5)*2.3)),len=(.12+.2*hash(k,7))*tp;
-      if(e>=.97)v=.06;else if(e>=.93)v=.45;
-      else if(e>.93-len)v=.9-(.93-e)/Math.max(.01,len)*.32-(hash(k,3)>.8?.25:0);
-      else v=.03+.04*hash(Math.floor(x*9),Math.floor(y*9))}}
-  /* главный глаз, зрачок всегда в центре */
-  const op=centerOpen(n,t),A=6,ax=Math.abs(x),ay=Math.abs(y);
-  const half=ax<A?3.2*op*Math.pow(1-(x/A)**2,.8):0;
-  if(ay<half){
-    const r=Math.hypot(x,y);
-    if(r<1){
-      let pv=0;
-      if(lvl<1){const rev=sm(30,200,320/hh);if(rev>0)pv=rev*layer(n+1,x*K,y*K,t,hb,lvl+1,hh*K)}
-      pv*=1-sm(.84,1,r);
-      if(n===5&&lvl===0&&Math.abs(x+.05)<.26&&Math.abs(y+.08)<.44)pv=Math.max(pv,.62+.1*Math.sin(y*40));
-      v=pv;
-    }else if(r<2.6){
-      const ang=Math.atan2(y,x);
-      if(n===4){const rr=r-1,k=Math.min(1,Math.floor(rr/.8)),cnt=10+6*k,q=(ang+Math.PI)/TAU*cnt,qi=Math.floor(q);
-        const rad=1+k*.8+.4,la=(q-qi-.5)*TAU*rad/cnt,lr=rr-k*.8-.4;
-        v=.18;v=miniEye(v,la,lr,.33,hash(Math.floor(t*1.5),qi+k*40)<.12?.1:1,0,0,qi);}
-      else v=r>2.38?.06:r<1.14?.1:.2+.3*vn(ang*7+n*3,r*3.5);
-      if((x+1.7)**2+(y+1.1)**2<.06)v=.97;
-    }else{
-      const nv=fbm(x*1.6+n,y*1.6);
-      v=.93-Math.max(0,1-Math.abs(nv-.5)*12)*.7-Math.max(0,ax-4)*.15;
-    }
-    if(r>=1)v-=Math.max(0,1-(half-ay)/(half*.4+.01))*(y<0?.45:.2);
-  }else if(n!==2||Math.hypot(x/7.1,y/5.4)>1.08){
-    const ring=Math.hypot(x/A,y/4);
-    if(ring<1.35){const k=1-ring/1.35,wr=Math.sin(y*5+x*.6+n)*.5+.5;v=v*(1-k*.5)+k*.35*wr}
-    if(ax<A&&ay-half<.25)v-=.5;
-  }else if(ax<A&&ay-half<.25)v-=.5;
-  return v;
+        if(!stare(t)){const l=Math.hypot(ex,ey)||1;lx=-ex/l*.24+Math.sin(t*.8+h1*20)*.04;ly=-ey/l*.18}
+        v=eye(v,x-ex,y-ey,r,o,lx,ly,h1*50,t,n,false,hb,lvl,hh)}}}
+  if(n===2){const th=Math.atan2(y,x),wob=1+.08*(fbm(th*2+3,t*.2)-.5)*2,e=Math.hypot(x/7.1,y/5.4)/wob;
+    if(e>.6&&e<1.12){const q=(th+Math.PI)/TAU*26+(fbm(th*3,1)-.5)*1.5,k=Math.floor(q),u=q-k;
+      const wd=.3+.3*hash(k,11),tp=Math.max(0,1-Math.abs(u-.5)/wd),len=(.1+.2*hash(k,7))*Math.sqrt(tp);
+      const gum=Math.exp(-(((e-.96)/.045)**2));
+      let tv=.03+.05*fbm(x*3,y*3);
+      if(e>.93-len&&e<.97&&hash(k,13)>.12)tv=.7+.18*fbm(x*4+k,y*4)-(.93-e)/Math.max(.01,len)*.25-(hash(k,3)>.8?.3:0);
+      tv=tv*(1-gum*.6)+.4*gum*(.8+.4*fbm(x*2,y*2));
+      const o=sm(1.12,1.0,e)*sm(.6,.68,e);v=v*(1-o)+tv*o}}
+  return eye(v,x,y,6,centerOpen(n,t),0,0,n*13.7,t,n,true,hb,lvl,hh);
 }
 
 /* вывод */
@@ -149,10 +149,10 @@ function text(t,fr){
   mc.clearRect(0,0,W,H);mc.textAlign='center';mc.textBaseline='middle';
   for(const [a,z,s] of MSG)if(t>=a&&t<z&&(hash(fr,5)>.18||a>40)){
     const big=s===s.toUpperCase(),lines=s.split('|');
-    mc.font=`bold ${big?26:18}px "Courier New",monospace`;
-    const y0=big?H*.5-18:a>40?H*.5:H*(.16+.1*hash(a|0,1)),j=big?3:1.5;
-    lines.forEach((l,k)=>{const ox=(hash(fr,k+9)-.5)*j*2,oy=(hash(fr,k+19)-.5)*j*2,y=y0+k*34;
-      mc.fillStyle='rgb(255,0,0)';mc.fillText(l,W/2+2+ox,y+2+oy);mc.fillStyle='rgb(0,255,0)';mc.fillText(l,W/2+ox,y+oy)});
+    mc.font=`bold ${big?13:10}px "Courier New",monospace`;
+    const y0=big?H*.5-8:a>40?H*.5:H*(.16+.1*hash(a|0,1)),j=big?1.5:.8;
+    lines.forEach((l,k)=>{const ox=(hash(fr,k+9)-.5)*j*2,oy=(hash(fr,k+19)-.5)*j*2,y=y0+k*16;
+      mc.fillStyle='rgb(255,0,0)';mc.fillText(l,W/2+1+ox,y+1+oy);mc.fillStyle='rgb(0,255,0)';mc.fillText(l,W/2+ox,y+oy)});
   }
   return mc.getImageData(0,0,W,H).data;
 }
@@ -161,22 +161,22 @@ function renderFrame(t){
   const sub=t>=39.6&&t<39.76,black=t>=38.8&&!sub;
   let d=depth(t);if(sub)d=3.35;
   const n=Math.floor(d),hh=S0*Math.pow(K,-(d-n));
-  const shx=(hash(fr,41)-.5)*te*3,shy=(hash(fr,42)-.5)*te*3;
+  const shx=(hash(fr,41)-.5)*te*1.5,shy=(hash(fr,42)-.5)*te*1.5;
   const tr=tear(fr),inv=!black&&hash(fr,43)<.004+te*.015;
   const scr=hash(fr,44)<.35?(hash(fr,45)*W|0):-1;
   for(let y=0;y<H;y++){
-    let sh=0;if(tr&&hash(y>>3,fr)<.35)sh=(hash(y>>4,fr+3)-.5)*60;
+    let sh=0;if(tr&&hash(y>>2,fr)<.35)sh=(hash(y>>3,fr+3)-.5)*30;
     const by=(y&3)*4;
     for(let x=0;x<W;x++){
       const i=y*W+x,o=i*4;let v=0;
-      if(!black)v=layer(n,(x-180+sh+shx)/320*hh,(y-320+shy)/320*hh,t,hb,0,hh);
-      v+=(hash(i,fr*7+1)-.5)*(black?.05:.15);
+      if(!black)v=layer(n,(x-90+sh+shx)/160*hh,(y-160+shy)/160*hh,t,hb,0,hh);
+      v+=(hash(i,fr*7+1)-.5)*(black?.05:.17);
       if(x===scr)v+=.4*hash(y>>2,fr);
-      const du=hash(i,fr*13);if(!black){if(du<.0004)v=1;else if(du>.9995)v=0}
+      const du=hash(i,fr*13);if(!black){if(du<.0008)v=1;else if(du>.999)v=0}
       if(inv)v=1-v;
-      const nx=(x-180)/180,ny=(y-320)/320;v*=1-.22*(nx*nx+ny*ny)*.5;
-      let l=Math.floor(v*4+BAY[by+(x&3)]);l=l<0?0:l>4?4:l;
-      if(md[o+1]>127)l=4;else if(md[o]>127)l=2;
+      const nx=(x-90)/90,ny=(y-160)/160;v*=1-.3*(nx*nx+ny*ny)*.5;
+      let l=Math.floor(v*3+BAY[by+(x&3)]);l=l<0?0:l>3?3:l;
+      if(md[o+1]>127)l=3;else if(md[o]>127)l=1;
       const c=PAL[l];px[o]=c[0];px[o+1]=c[1];px[o+2]=c[2];px[o+3]=255;
     }
   }
