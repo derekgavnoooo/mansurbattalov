@@ -59,6 +59,7 @@ class BG:
             s = 1 + (zoom - 1) * (.3 + 1.5 * dd ** 2 * depth)
             sx = cx + (ux - cx) / s - px * mx * (.35 + .65 * dd * depth)
             sy = cy + (uy - cy) / s - py * my * (.35 + .65 * dd * depth)
+            sx, sy = sx.astype(np.float32), sy.astype(np.float32)
         return cv2.remap(self.im, sx, sy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 
 class Sprite:
@@ -135,7 +136,9 @@ def eye(cv, cx, cy, r, op=1., gx=0., gy=0., seed=0, t=0., bright=1.):
 
 def ring(cv, cx, cy, R, tilt, spin, t, n_eyes=12, thick=4., bright=1., eyes=True, op=1., look=0., seed=0):
     """Горящее колесо с глазами: неровная полоса из пятен, глаза поверх."""
-    pts = []
+    for i in range(int(2 * math.pi * R / 3)):
+        s = i / (2 * math.pi * R / 3) * 2 * math.pi
+        cv2.circle(cv, (int((cx + R * math.cos(s)) * 4), int((cy + R * math.sin(s) * tilt) * 4)), int(thick * 1.9 * 4), .04, -1, cv2.LINE_AA, 2)
     for i in range(int(2 * math.pi * R / 1.6)):
         s = i / (2 * math.pi * R / 1.6) * 2 * math.pi
         rr = R * (1 + .06 * (rnd(int(s * 5) + seed, int(t * 3)) - .5))
@@ -214,7 +217,7 @@ def fl(t, sp=2.2, a=.5): return a * math.sin(t * sp)
 def s_hook(lt, t, E, fr):
     c = A['cloudsea'].view(1 + .12 * lt / 3.5, .2 * math.sin(lt * .5), 0)
     eye(c, 180, 230, 150, sm(.1, .5, lt), 0, 0, 7, t, .9)
-    A['elder'].draw(c, 150, 520, 150, 0, fl(t), .02, .3, rim=.4); A['younger_f'].draw(c, 235, 535, 125, 0, fl(t + 1), .02, .25, rim=.3)
+    A['elder'].draw(c, 135, 500, 230, 0, fl(t), .05, .9, rim=.3, glow=.2); A['younger_f'].draw(c, 250, 525, 185, 0, fl(t + 1), .04, .7, rim=.25)
     return c
 def s_hall(lt, t, E, fr):
     c = A['heaven'].view(1.05 + .1 * lt / 3.5, -.6 + .4 * lt / 3.5, 0)
@@ -230,7 +233,7 @@ def s_young_close(lt, t, E, fr):
 def s_elder_halo(lt, t, E, fr):
     c = A['heaven'].view(1.2 + .05 * lt, .2, -.3)
     A['elder'].draw(c, 180, 400, 470, 0, fl(t, 1.6, .3), .04, 1., glow=.35)
-    ring(c, 180, 130, 70, .3, t * .5, t, 10, 4, 1., True, 1)
+    ring(c, 180, 125, 80, .32, t * .5, t, 9, 6.5, 1., True, 1)
     return c
 def s_wheels_close(lt, t, E, fr):
     c = A['heaven'].view(1.3, 0, 0) * (1 - .4 * sm(0, 3.5, lt))
@@ -293,17 +296,17 @@ def s_fall_storm(lt, t, E, fr):
     c = A['storm'].view(1 + .9 * lt / 4, .3 * math.sin(t * 2), 0, 1.3, .5, .5)
     if rnd(fr, 77) < .15: lightning(c, fr, 60 + 240 * rnd(fr, 78), 0, 640, 2); c += .2
     speedlines(c, t, 50, 3, True, .45)
-    A['dive'].draw(c, 180 + 15 * math.sin(t * 3), 320, 300, 180 + 6 * math.sin(t * 5), 0, .02, .75, rim=.6)
+    A['dive'].draw(c, 180 + 15 * math.sin(t * 3), 320, 300, 180 + 6 * math.sin(t * 5), 0, .02, .75, rim=.3)
     return c
 def s_columns(lt, t, E, fr):
     c = A['columns'].view(1 + .8 * lt / 4, -.8 + .5 * lt, .8 - .4 * lt, 1.4)
     speedlines(c, t, 40, 5, True, .4)
-    A['dive'].draw(c, 200, 360, 200, 175, 0, .02, .7, rim=.6)
+    A['dive'].draw(c, 200, 360, 200, 175, 0, .02, .7, rim=.3)
     return c
 def s_reach_far(lt, t, E, fr):
     c = A['storm'].view(1.2 + .3 * lt / 4, 0, 0, 1.2) * .8
     A['fall'].draw(c, 180 + 10 * math.sin(t), 520, 70, lt * 15, fl(t, 4, .3), .02, .6, rim=.5)
-    A['dive'].draw(c, 180, 170, 210, 180, 0, .02, .7, rim=.6)
+    A['dive'].draw(c, 180, 170, 210, 180, 0, .02, .7, rim=.3)
     speedlines(c, t, 30, 6, True, .35)
     return c
 def s_vortex(lt, t, E, fr):
@@ -320,10 +323,10 @@ def s_void(lt, t, E, fr, eyes=True, reach=False):
             o = sm(.5 + rnd(k, 44) * 3, 1 + rnd(k, 44) * 3, lt)
             if o > 0: eye(c, rnd(k, 41) * W, rnd(k, 42) * H, 5 + 8 * rnd(k, 43), o, 0, 0, k * 5, t, .7)
     if reach:
-        A['fall'].draw(c, 230, 470 - 30 * lt / 5, 90, 15, 0, .02, .55, rim=.6)
-        A['dive'].draw(c, 140, 180 + 60 * lt / 5, 110, 160, 0, .02, .6, rim=.6)
+        A['fall'].draw(c, 230, 470 - 30 * lt / 5, 90, 15, 0, .02, .55, rim=.3)
+        A['dive'].draw(c, 140, 180 + 60 * lt / 5, 110, 160, 0, .02, .6, rim=.3)
     else:
-        A['dive'].draw(c, 180, 300, 140, 175 + 4 * math.sin(t), 0, .02, .55, rim=.6)
+        A['dive'].draw(c, 180, 300, 140, 175 + 4 * math.sin(t), 0, .02, .55, rim=.3)
     return c
 def s_last_eye(lt, t, E, fr):
     c = A['void'].view(1.15, 0, 0) * .5
@@ -333,8 +336,8 @@ def s_rise_light(lt, t, E, fr, close=0.):
     c = A['light'].view(1 + .25 * lt / 4 + close * .3, 0, -.3, 1.2)
     rays(c, 180, 640, .8, .5)
     gap = 1 - close
-    A['fall'].draw(c, 180, 470 - 120 * close, 110 + 80 * close, 10, fl(t, 3, .3), .02, .7, rim=.7)
-    A['dive'].draw(c, 180, 150 + 160 * close, 160 + 60 * close, 178, 0, .02, .7, rim=.7)
+    A['fall'].draw(c, 180, 470 - 120 * close, 110 + 80 * close, 10, fl(t, 3, .3), .02, .7, rim=.35)
+    A['dive'].draw(c, 180, 150 + 160 * close, 160 + 60 * close, 178, 0, .02, .7, rim=.35)
     feathers(c, t, 10, 12, -40, .8, 1., True)
     return c
 def s_meet(lt, t, E, fr):
@@ -353,7 +356,7 @@ def s_rose(lt, t, E, fr):
     c = A['light'].view(1 + .4 * lt / 4, 0, 0, 1.2)
     for k, (R, ti) in enumerate([(240, .3), (190, .32), (140, .34), (95, .36)]):
         ring(c, 180, 470, R * (1 + .15 * lt / 4), ti, t * (.2 + .1 * k) * (1 if k % 2 else -1), t, 18 - 3 * k, 4, 1., True, 1, 1, k * 7)
-    A['embrace'].draw(c, 180, 250 + 150 * lt / 4, 150 * (1 - .4 * lt / 4), 0, fl(t, 1.2, .5), .03, .8, rim=.6)
+    A['embrace'].draw(c, 180, 250 + 150 * lt / 4, 150 * (1 - .4 * lt / 4), 0, fl(t, 1.2, .5), .03, .8, rim=.3)
     rays(c, 180, 470, 1., .5)
     return c
 def s_into(lt, t, E, fr):
@@ -404,7 +407,7 @@ def frame(t, E, F):
     fr = int(round(t * FPS)); i = 0
     while i < len(SHOTS) - 1 and t >= SHOTS[i + 1][0]: i += 1
     t0, fn, cold = SHOTS[i]; lt = t - t0
-    c = fn(lt, t, E, fr).astype(np.float32)
+    c = np.nan_to_num(fn(lt, t, E, fr).astype(np.float32), nan=0.)
     bloom(c, .35 + .25 * E)
     if any(t0 == x and lt < .17 for x in CUTS): c += .35
     tear = any(abs(t - x) < .1 for x in CUTS) or rnd(fr, 31) < .02
