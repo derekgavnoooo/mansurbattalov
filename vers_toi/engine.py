@@ -39,6 +39,8 @@ class BG:
     def __init__(self, img, dep):
         im = np.asarray(Image.open(img).convert('L'), np.float32) / 255
         d = np.asarray(Image.open(dep).convert('L').resize(im.shape[::-1]), np.float32) / 255
+        mh, mw = int(im.shape[0] * .05), int(im.shape[1] * .06)
+        im, d = im[mh:-mh, mw:-mw], d[mh:-mh, mw:-mw]
         sw, sh = int(W * 1.22), int(H * 1.22)
         sc = max(sw / im.shape[1], sh / im.shape[0])
         nw, nh = int(im.shape[1] * sc + .5), int(im.shape[0] * sc + .5)
@@ -84,7 +86,7 @@ class Sprite:
         if abs(flap) > 1e-3:
             yy, xx = np.mgrid[0:self.h, 0:self.w].astype(np.float32)
             dx = (xx - self.cx) / (self.w * .5)
-            mapy = yy + flap * self.h * .12 * np.sign(dx) * 0 + flap * self.h * .12 * np.abs(dx) ** 1.6 * (1 - yy / self.h)
+            mapy = yy + flap * self.h * .12 * np.abs(dx) ** 1.6 * (1 - yy / self.h)
             g = cv2.remap(g, xx, mapy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=1)
             a = cv2.remap(a, xx, mapy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
         s = height / self.h
