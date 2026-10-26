@@ -66,11 +66,16 @@ class Sprite:
     def __init__(self, path, flip=False):
         g = np.asarray(Image.open(path).convert('L'), np.float32) / 255
         if flip: g = g[:, ::-1].copy()
-        bright = (g > .78).astype(np.uint8)
-        n, lab = cv2.connectedComponents(bright)
-        border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
-        bg = np.isin(lab, list(border)) & (bright > 0)
-        fg = (~bg).astype(np.uint8)
+        cut = path.replace('/ch_', '/cut_')
+        try:
+            al = np.asarray(Image.open(cut).convert('RGBA'), np.float32)[:, :, 3] / 255
+            if flip: al = al[:, ::-1].copy()
+            fg = (al > .5).astype(np.uint8)
+        except FileNotFoundError:
+            bright = (g > .78).astype(np.uint8)
+            n, lab = cv2.connectedComponents(bright)
+            border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
+            fg = (~(np.isin(lab, list(border)) & (bright > 0))).astype(np.uint8)
         fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         n, lab, st, _ = cv2.connectedComponentsWithStats(fg)
         if n > 1:
